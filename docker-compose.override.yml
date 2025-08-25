@@ -1,0 +1,59 @@
+# Development ortamı için özelleştirmeler
+# docker-compose up komutuyla otomatik olarak yüklenir
+
+version: '3.8'
+
+services:
+  backend:
+    volumes:
+      # Mount structured backend code into container app path
+      - ./agentik-b2b-app/backend/app:/app/app
+      # Persist logs locally during dev
+      - ./logs:/app/logs
+      # Avoid caching noise
+      - /app/__pycache__
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+    command: [
+      "uvicorn", 
+      "app.main:app", 
+      "--host", "0.0.0.0", 
+      "--port", "8000", 
+      "--reload"
+    ]
+    
+  agent-orchestrator:
+    volumes:
+      - ./agent_orchestrator:/app
+      - /app/__pycache__
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    
+  # Development için Redis GUI (opsiyonel)
+  redis-gui:
+    image: redislabs/redisinsight:latest
+    container_name: agentik-redis-gui
+    ports:
+      - "8001:8001"
+    volumes:
+      - redis_gui_data:/db
+    networks:
+      - agentik-network
+    depends_on:
+      - redis
+    profiles:
+      - development
+
+volumes:
+  redis_gui_data:
+    driver: local

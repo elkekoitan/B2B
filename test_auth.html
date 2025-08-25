@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Test</title>
+</head>
+<body>
+    <h1>Testing Mock Authentication</h1>
+    <button onclick="testAuth()">Test Mock Admin Authentication</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAuth() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Test with mock admin token
+                const response = await fetch('http://localhost:8000/rfqs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer mock-admin-token'
+                    },
+                    body: JSON.stringify({
+                        title: 'Test RFQ',
+                        description: 'Test description',
+                        category: 'electronics',
+                        quantity: 10,
+                        unit: 'pieces',
+                        deadline: '2025-09-01T10:00:00Z',
+                        delivery_location: 'Istanbul'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <h3 style="color: green;">✅ Authentication Working!</h3>
+                        <p>Status: ${response.status}</p>
+                        <p>Response: ${JSON.stringify(data, null, 2)}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <h3 style="color: red;">❌ Error</h3>
+                        <p>Status: ${response.status}</p>
+                        <p>Error: ${JSON.stringify(data, null, 2)}</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3 style="color: red;">❌ Network Error</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

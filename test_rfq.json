@@ -1,0 +1,13 @@
+{
+  "title": "Test RFQ - 1000 Adet Elektronik Komponent",
+  "description": "1000 adet yüksek kalite elektronik komponent tedariki için RFQ. Teslim süresi maksimum 30 gün.",
+  "category": "electronics",
+  "quantity": 1000,
+  "unit": "pieces",
+  "budget_min": 5000,
+  "budget_max": 15000,
+  "deadline": "2025-09-23T00:00:00.000Z",
+  "delivery_location": "Istanbul, Turkey",
+  "requirements": "CE sertifikası gerekli, kalite kontrol raporu istenecek",
+  "priority": "medium"
+}

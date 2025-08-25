@@ -1,0 +1,20 @@
+CREATE TABLE rfqs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requester_id UUID NOT NULL,
+    company_id UUID NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(100),
+    quantity INTEGER,
+    unit VARCHAR(50),
+    budget_min DECIMAL(15,2),
+    budget_max DECIMAL(15,2),
+    deadline_date DATE,
+    delivery_location TEXT,
+    requirements JSONB,
+    status VARCHAR(50) DEFAULT 'draft',
+    priority VARCHAR(20) DEFAULT 'medium',
+    attachments JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);

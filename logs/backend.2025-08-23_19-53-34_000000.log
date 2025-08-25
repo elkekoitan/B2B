@@ -1,0 +1,165 @@
+2025-08-23 22:49:57.335 | ERROR    | app.main:create_rfq:113 - RFQ creation failed: 'MockSupabaseResponse' object has no attribute 'execute'
+2025-08-23 22:50:54.699 | INFO     | app.main:create_rfq:102 - Created RFQ 0cf7d91b-8998-4356-b331-4006ff4321bf for user test-user-123
+2025-08-23 22:51:49.642 | ERROR    | app.main:trigger_agent_workflow:480 - Workflow trigger failed: Object of type date is not JSON serializable
+2025-08-23 22:53:14.168 | INFO     | app.main:create_rfq:102 - Created RFQ fc7a7172-d063-40c7-a970-c3961d7b3c91 for user test-user-123
+2025-08-23 22:53:14.193 | INFO     | app.redis_client:create_job:106 - Created mock job 5513bcf5-a905-4fa0-b564-83fd7920c5c5 of type rfq_process
+2025-08-23 22:53:14.193 | INFO     | app.main:trigger_agent_workflow:465 - Started agent workflow 5513bcf5-a905-4fa0-b564-83fd7920c5c5 for RFQ fc7a7172-d063-40c7-a970-c3961d7b3c91
+2025-08-23 22:53:24.337 | INFO     | app.main:create_rfq:102 - Created RFQ 6ef432f8-6b4c-4d35-a2c7-93615fa4682d for user test-user-123
+2025-08-23 22:53:35.428 | INFO     | app.redis_client:create_job:106 - Created mock job e5979a76-6d5b-4972-92c2-42c43d584d84 of type rfq_process
+2025-08-23 22:53:35.428 | INFO     | app.main:trigger_agent_workflow:465 - Started agent workflow e5979a76-6d5b-4972-92c2-42c43d584d84 for RFQ 6ef432f8-6b4c-4d35-a2c7-93615fa4682d
+2025-08-24 16:45:00.532 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:45:00.683 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:49:56.765 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:49:59.765 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:50:00.357 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:50:07.570 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:51:43.534 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:51:43.536 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:51:47.352 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:51:48.982 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:51:54.336 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 16:51:54.341 | ERROR    | app.auth:decode_jwt_payload:30 - Token decode failed: Invalid token format
+2025-08-24 17:02:58.163 | INFO     | app.main:create_rfq:102 - Created RFQ 8ad62d9a-15f7-4cd9-8645-234bea3781a3 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:02:58.217 | INFO     | app.redis_client:create_job:106 - Created mock job 0178bc36-85c5-4648-b2fc-f83a117909aa of type rfq_process
+2025-08-24 17:02:58.217 | INFO     | app.main:trigger_agent_workflow:465 - Started agent workflow 0178bc36-85c5-4648-b2fc-f83a117909aa for RFQ 8ad62d9a-15f7-4cd9-8645-234bea3781a3
+2025-08-24 17:03:01.018 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:03:01.021 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:03:30.214 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:03:30.431 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:03:40.173 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:03:40.225 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:05:12.868 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:30:28.148 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:30:42.732 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:30:42.837 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:30:58.650 | ERROR    | app.main:list_rfqs:160 - RFQ listing failed: 1 validation error for RFQ
+requirements
+  Input should be a valid dictionary [type=dict_type, input_value='', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.5/v/dict_type
+2025-08-24 17:32:42.999 | INFO     | app.main:create_rfq:102 - Created RFQ 084b2e6f-4d7d-40aa-8504-99a985e016e1 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:35:29.364 | INFO     | app.main:create_rfq:102 - Created RFQ d492fbed-b76b-4ba8-8437-8fee9705aded for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:35:29.411 | INFO     | app.redis_client:create_job:106 - Created mock job c59d8264-98e9-4526-a35a-a698285fd6ed of type rfq_process
+2025-08-24 17:35:29.412 | INFO     | app.main:trigger_agent_workflow:465 - Started agent workflow c59d8264-98e9-4526-a35a-a698285fd6ed for RFQ d492fbed-b76b-4ba8-8437-8fee9705aded
+2025-08-24 17:39:29.023 | INFO     | app.main:create_rfq:102 - Created RFQ 2e15b8d2-b46f-4642-8a6e-cd4545a529b4 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:40:19.634 | INFO     | app.main:create_rfq:102 - Created RFQ b234e05f-079a-4712-97c1-26b81b368dda for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:40:49.096 | INFO     | app.main:create_rfq:102 - Created RFQ fdbab2cf-f10a-4f90-9833-2ff2f94c7e2b for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:40:49.101 | INFO     | app.main:create_rfq:102 - Created RFQ c136ac98-c1fc-4ff1-a4cf-c5defe2aabba for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:40:49.131 | INFO     | app.main:create_rfq:102 - Created RFQ 79767fcf-db13-4958-b3e4-898f61ecaf30 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:41:41.355 | INFO     | app.main:create_rfq:102 - Created RFQ f4db620f-e19a-4daa-9630-585c28952d1a for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:43:37.438 | INFO     | app.main:create_rfq:102 - Created RFQ 848cf2b2-e72a-4491-9810-89628d2d85ae for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:55:11.960 | INFO     | app.main:create_rfq:106 - Created RFQ e4cad590-e0e4-4978-aeda-63f35ea48766 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:55:11.962 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ e4cad590-e0e4-4978-aeda-63f35ea48766
+2025-08-24 17:55:11.962 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ e4cad590-e0e4-4978-aeda-63f35ea48766: Found 3 suppliers
+2025-08-24 17:56:32.906 | INFO     | app.main:create_rfq:106 - Created RFQ b46d34e4-671b-4919-9f4b-dd9801f16b68 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 17:56:32.908 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ b46d34e4-671b-4919-9f4b-dd9801f16b68
+2025-08-24 17:56:32.908 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ b46d34e4-671b-4919-9f4b-dd9801f16b68: Found 3 suppliers
+2025-08-24 18:03:03.413 | INFO     | app.main:create_rfq:106 - Created RFQ 73bd317c-89b8-4477-b0f7-2b75cd8c2683 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.414 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 73bd317c-89b8-4477-b0f7-2b75cd8c2683
+2025-08-24 18:03:03.415 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 73bd317c-89b8-4477-b0f7-2b75cd8c2683: Found 15 suppliers
+2025-08-24 18:03:03.421 | INFO     | app.main:create_rfq:106 - Created RFQ f1f0ce38-998c-40b8-81ce-b310a0921c39 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.421 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ f1f0ce38-998c-40b8-81ce-b310a0921c39
+2025-08-24 18:03:03.422 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ f1f0ce38-998c-40b8-81ce-b310a0921c39: Found 11 suppliers
+2025-08-24 18:03:03.426 | INFO     | app.main:create_rfq:106 - Created RFQ 2d45a43b-0457-46f7-8033-6d63184aadeb for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.426 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 2d45a43b-0457-46f7-8033-6d63184aadeb
+2025-08-24 18:03:03.427 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 2d45a43b-0457-46f7-8033-6d63184aadeb: Found 10 suppliers
+2025-08-24 18:03:03.431 | INFO     | app.main:create_rfq:106 - Created RFQ 803a5724-3ed9-492f-b2f2-3de2d7f66911 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.432 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 803a5724-3ed9-492f-b2f2-3de2d7f66911
+2025-08-24 18:03:03.432 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 803a5724-3ed9-492f-b2f2-3de2d7f66911: Found 10 suppliers
+2025-08-24 18:03:03.437 | INFO     | app.main:create_rfq:106 - Created RFQ c7cbec66-9efc-4083-9d7b-ad3856cb3f30 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.438 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ c7cbec66-9efc-4083-9d7b-ad3856cb3f30
+2025-08-24 18:03:03.438 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ c7cbec66-9efc-4083-9d7b-ad3856cb3f30: Found 10 suppliers
+2025-08-24 18:03:03.442 | INFO     | app.main:create_rfq:106 - Created RFQ 2329c5f7-fa5f-4ed3-98d7-5e11e0968b1f for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.443 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 2329c5f7-fa5f-4ed3-98d7-5e11e0968b1f
+2025-08-24 18:03:03.443 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 2329c5f7-fa5f-4ed3-98d7-5e11e0968b1f: Found 10 suppliers
+2025-08-24 18:03:03.447 | INFO     | app.main:create_rfq:106 - Created RFQ 3aeb498f-2c6a-4fc0-b6fc-4765d3c36cd0 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.447 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 3aeb498f-2c6a-4fc0-b6fc-4765d3c36cd0
+2025-08-24 18:03:03.448 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 3aeb498f-2c6a-4fc0-b6fc-4765d3c36cd0: Found 10 suppliers
+2025-08-24 18:03:03.453 | INFO     | app.main:create_rfq:106 - Created RFQ e41d6d08-69c0-41c8-a68d-0e97990f6ad1 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.453 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ e41d6d08-69c0-41c8-a68d-0e97990f6ad1
+2025-08-24 18:03:03.453 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ e41d6d08-69c0-41c8-a68d-0e97990f6ad1: Found 10 suppliers
+2025-08-24 18:03:03.458 | INFO     | app.main:create_rfq:106 - Created RFQ 7eaf29d1-f8ac-4e85-90bb-810ca12787ef for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.459 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 7eaf29d1-f8ac-4e85-90bb-810ca12787ef
+2025-08-24 18:03:03.459 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 7eaf29d1-f8ac-4e85-90bb-810ca12787ef: Found 15 suppliers
+2025-08-24 18:03:03.463 | INFO     | app.main:create_rfq:106 - Created RFQ e8b11b16-9e84-4b86-b871-ebd72b3e744e for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.463 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ e8b11b16-9e84-4b86-b871-ebd72b3e744e
+2025-08-24 18:03:03.464 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ e8b11b16-9e84-4b86-b871-ebd72b3e744e: Found 11 suppliers
+2025-08-24 18:03:03.491 | INFO     | app.main:create_rfq:106 - Created RFQ 6092d9bd-988e-424f-be9a-080f294cc064 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 18:03:03.491 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 6092d9bd-988e-424f-be9a-080f294cc064
+2025-08-24 18:03:03.492 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 6092d9bd-988e-424f-be9a-080f294cc064: Found 10 suppliers
+2025-08-24 19:11:38.720 | INFO     | app.main:create_rfq:106 - Created RFQ 13af5797-6dc1-40ca-99b2-9aa5ac840bb6 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 19:11:38.729 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 13af5797-6dc1-40ca-99b2-9aa5ac840bb6
+2025-08-24 19:11:38.730 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 13af5797-6dc1-40ca-99b2-9aa5ac840bb6: Found 13 suppliers
+2025-08-24 19:11:47.323 | INFO     | app.main:create_rfq:106 - Created RFQ 2a234efe-3c2c-4219-971c-3673037fac7c for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 19:11:47.324 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 2a234efe-3c2c-4219-971c-3673037fac7c
+2025-08-24 19:11:47.324 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 2a234efe-3c2c-4219-971c-3673037fac7c: Found 13 suppliers
+2025-08-24 19:11:53.335 | INFO     | app.main:create_rfq:106 - Created RFQ 4bd2eddd-2122-451b-a21f-85f91d3fc0e3 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 19:11:53.335 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 4bd2eddd-2122-451b-a21f-85f91d3fc0e3
+2025-08-24 19:11:53.335 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 4bd2eddd-2122-451b-a21f-85f91d3fc0e3: Found 13 suppliers
+2025-08-24 19:11:53.341 | INFO     | app.main:get_supplier_analysis:202 - Generating supplier analysis for RFQ 4bd2eddd-2122-451b-a21f-85f91d3fc0e3
+2025-08-24 20:44:57.275 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 7cea5a16-11e2-4361-821d-5257b7acbbdf
+2025-08-24 20:44:57.277 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 7cea5a16-11e2-4361-821d-5257b7acbbdf: Found 13 suppliers
+2025-08-24 20:44:57.282 | INFO     | app.redis_client:create_job:106 - Created mock job 29b4478d-f17a-4d8a-946f-007c3a187829 of type rfq_process
+2025-08-24 20:44:57.283 | INFO     | app.main:trigger_agent_workflow:596 - Started agent workflow 29b4478d-f17a-4d8a-946f-007c3a187829 for RFQ 7cea5a16-11e2-4361-821d-5257b7acbbdf
+2025-08-24 20:47:28.298 | INFO     | app.main:create_rfq:106 - Created RFQ 6f29a1e2-260d-490e-8155-8eb317d169d8 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.299 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 6f29a1e2-260d-490e-8155-8eb317d169d8
+2025-08-24 20:47:28.299 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 6f29a1e2-260d-490e-8155-8eb317d169d8: Found 13 suppliers
+2025-08-24 20:47:28.305 | INFO     | app.main:create_rfq:106 - Created RFQ 7c7b166f-2f75-43ec-9f8c-c6a1cac8ba35 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.305 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 7c7b166f-2f75-43ec-9f8c-c6a1cac8ba35
+2025-08-24 20:47:28.306 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 7c7b166f-2f75-43ec-9f8c-c6a1cac8ba35: Found 11 suppliers
+2025-08-24 20:47:28.311 | INFO     | app.main:create_rfq:106 - Created RFQ e2a7c1d6-dd30-4bda-be04-5a79fd2e5555 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.312 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ e2a7c1d6-dd30-4bda-be04-5a79fd2e5555
+2025-08-24 20:47:28.312 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ e2a7c1d6-dd30-4bda-be04-5a79fd2e5555: Found 10 suppliers
+2025-08-24 20:47:28.316 | INFO     | app.main:create_rfq:106 - Created RFQ 4641a329-4b09-47cf-9f98-28e1653bb056 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.316 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 4641a329-4b09-47cf-9f98-28e1653bb056
+2025-08-24 20:47:28.317 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 4641a329-4b09-47cf-9f98-28e1653bb056: Found 10 suppliers
+2025-08-24 20:47:28.387 | INFO     | app.main:create_rfq:106 - Created RFQ 4d32a741-1367-4585-bd46-e026ccd48ece for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.387 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 4d32a741-1367-4585-bd46-e026ccd48ece
+2025-08-24 20:47:28.387 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 4d32a741-1367-4585-bd46-e026ccd48ece: Found 10 suppliers
+2025-08-24 20:47:28.428 | INFO     | app.main:create_rfq:106 - Created RFQ f5442e97-14d2-45d5-948c-0e19dc5034cc for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.429 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ f5442e97-14d2-45d5-948c-0e19dc5034cc
+2025-08-24 20:47:28.429 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ f5442e97-14d2-45d5-948c-0e19dc5034cc: Found 10 suppliers
+2025-08-24 20:47:28.434 | INFO     | app.main:create_rfq:106 - Created RFQ 3ed7ba49-5449-4198-9279-c15a42645e90 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.435 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 3ed7ba49-5449-4198-9279-c15a42645e90
+2025-08-24 20:47:28.435 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 3ed7ba49-5449-4198-9279-c15a42645e90: Found 10 suppliers
+2025-08-24 20:47:28.441 | INFO     | app.main:create_rfq:106 - Created RFQ 60acd931-1843-47d9-bb4d-6fdb33986147 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.442 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 60acd931-1843-47d9-bb4d-6fdb33986147
+2025-08-24 20:47:28.442 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 60acd931-1843-47d9-bb4d-6fdb33986147: Found 10 suppliers
+2025-08-24 20:47:28.485 | INFO     | app.main:create_rfq:106 - Created RFQ faea8341-2f54-4bbd-ae97-84b0dbf3382e for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.486 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ faea8341-2f54-4bbd-ae97-84b0dbf3382e
+2025-08-24 20:47:28.486 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ faea8341-2f54-4bbd-ae97-84b0dbf3382e: Found 13 suppliers
+2025-08-24 20:47:28.492 | INFO     | app.main:create_rfq:106 - Created RFQ 9b970849-4cf2-45b2-b6e0-e3acc20dc00a for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.492 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 9b970849-4cf2-45b2-b6e0-e3acc20dc00a
+2025-08-24 20:47:28.493 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 9b970849-4cf2-45b2-b6e0-e3acc20dc00a: Found 11 suppliers
+2025-08-24 20:47:28.500 | INFO     | app.main:create_rfq:106 - Created RFQ 16538b16-724c-40da-9535-d353544b0d80 for user 8559c7d9-4ce8-4902-8ab9-a52cecd65fc2
+2025-08-24 20:47:28.500 | INFO     | app.main:create_rfq:109 - Starting supplier discovery for RFQ 16538b16-724c-40da-9535-d353544b0d80
+2025-08-24 20:47:28.500 | INFO     | app.main:create_rfq:122 - Supplier analysis completed for RFQ 16538b16-724c-40da-9535-d353544b0d80: Found 10 suppliers

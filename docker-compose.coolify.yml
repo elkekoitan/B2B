@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: agentik-redis
+    networks:
+      - agentik-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentik-backend
+    environment:
+      - ENVIRONMENT=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-${SUPABASE_KEY}}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379
+      - SMTP_SERVER=${SMTP_SERVER:-${EMAIL_SMTP_SERVER:-smtp.gmail.com}}
+      - SMTP_PORT=${SMTP_PORT:-${EMAIL_SMTP_PORT:-587}}
+      - SMTP_USERNAME=${SMTP_USERNAME:-${EMAIL_USERNAME}}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-${EMAIL_PASSWORD}}
+      - USE_MOCK_SUPABASE=${USE_MOCK_SUPABASE:-false}
+      - USE_MOCK_REDIS=${USE_MOCK_REDIS:-false}
+    depends_on:
+      - redis
+    networks:
+      - agentik-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+    ports:
+      - "18000:8000"   # Expose API on host:18000
+
+  agent-orchestrator:
+    build:
+      context: ./agent_orchestrator
+      dockerfile: Dockerfile
+    container_name: agentik-agents
+    environment:
+      - ENVIRONMENT=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-${SUPABASE_KEY}}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_URL=redis://redis:6379
+      - SMTP_SERVER=${SMTP_SERVER:-${EMAIL_SMTP_SERVER:-smtp.gmail.com}}
+      - SMTP_PORT=${SMTP_PORT:-${EMAIL_SMTP_PORT:-587}}
+      - SMTP_USERNAME=${SMTP_USERNAME:-${EMAIL_USERNAME}}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-${EMAIL_PASSWORD}}
+    depends_on:
+      - redis
+      - backend
+    networks:
+      - agentik-network
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-${SUPABASE_KEY}}
+        - VITE_API_URL=${VITE_API_URL}
+    container_name: agentik-frontend
+    environment:
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-${SUPABASE_KEY}}
+      # IMPORTANT: Set to your server's public IP with backend port 18000
+      - VITE_API_URL=${VITE_API_URL:-http://YOUR_SERVER_IP:18000}
+    depends_on:
+      - backend
+    networks:
+      - agentik-network
+    restart: unless-stopped
+    ports:
+      - "13000:80"     # Expose UI on host:13000
+
+networks:
+  agentik-network:
+    driver: bridge
+    name: agentik-network
+
+volumes:
+  redis_data:
+    driver: local
+    name: agentik-redis-data

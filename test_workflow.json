@@ -1,0 +1,7 @@
+{
+  "job_type": "rfq_process",
+  "rfq_id": "0cf7d91b-8998-4356-b331-4006ff4321bf",
+  "payload": {
+    "test": true
+  }
+}

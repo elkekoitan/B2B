@@ -1,0 +1,107 @@
+# Docker Compose for Agentik B2B Application
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: agentik-postgres
+    environment:
+      - POSTGRES_DB=agentik_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agentik-network
+
+  # Redis for Caching and Queues
+  redis:
+    image: redis:7-alpine
+    container_name: agentik-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - agentik-network
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agentik-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentik_db
+      - REDIS_URL=redis://redis:6379/0
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SMTP_SERVER=${SMTP_SERVER:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+    networks:
+      - agentik-network
+    restart: unless-stopped
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./agentik-frontend
+      dockerfile: Dockerfile
+    container_name: agentik-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - VITE_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - agentik-network
+    restart: unless-stopped
+
+  # Agent Orchestrator (Python)
+  agent-orchestrator:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: agentik-agents
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/agentik_db
+      - REDIS_URL=redis://redis:6379/0
+      - BACKEND_API_URL=http://backend:8000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    volumes:
+      - ./agents:/app
+    networks:
+      - agentik-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_uploads:
+
+networks:
+  agentik-network:
+    driver: bridge

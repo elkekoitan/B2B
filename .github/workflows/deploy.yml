@@ -1,0 +1,67 @@
+name: Deploy to Server (SSH)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy'
+        required: false
+        default: 'main'
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'docker-compose.prod.yml'
+      - 'Dockerfile'
+      - 'frontend/**'
+      - 'app/**'
+      - 'agent_orchestrator/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SSH_HOST && secrets.SSH_USER && secrets.SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH=${DEPLOY_PATH:-/opt/agentik-b2b}
+            REPO=${REPO_URL:-${{ github.server_url }}/${{ github.repository }}}
+            BRANCH=${REF_NAME:-${{ github.ref_name }}}
+
+            sudo mkdir -p "$DEPLOY_PATH"
+            sudo chown -R $USER "$DEPLOY_PATH"
+
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              git clone "$REPO" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+            git fetch --all --prune
+            git checkout "$BRANCH"
+            git pull --ff-only origin "$BRANCH"
+
+            # Ensure .env exists on server with production values
+            if [ ! -f .env ]; then
+              if [ -n "${APP_ENV_FILE:-}" ]; then
+                echo "Writing .env from secret APP_ENV_FILE"
+                printf "%s" "$APP_ENV_FILE" > .env
+              else
+                echo "Missing .env in $DEPLOY_PATH and no APP_ENV_FILE secret provided. Aborting." >&2
+                exit 1
+              fi
+            fi
+
+            # Use the Coolify-oriented compose (no domain, exposed 13000/18000)
+            docker compose -f docker-compose.coolify.yml --env-file .env build --no-cache
+            docker compose -f docker-compose.coolify.yml --env-file .env up -d

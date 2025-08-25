@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentik B2B - RFQ Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .rfq-list {
+            margin-top: 30px;
+        }
+        .rfq-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Agentik B2B - RFQ Gönderme Testi</h1>
+        
+        <form id="rfqForm">
+            <div class="form-group">
+                <label for="title">RFQ Başlığı *</label>
+                <input type="text" id="title" required placeholder="Örnek: 1000 adet Elektronik Komponent Tedariki">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="category">Kategori *</label>
+                    <select id="category" required>
+                        <option value="">Kategori seçin</option>
+                        <option value="electronics">Electronics</option>
+                        <option value="machinery">Machinery</option>
+                        <option value="chemicals">Chemicals</option>
+                        <option value="textiles">Textiles</option>
+                        <option value="automotive">Automotive</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="priority">Öncelik</label>
+                    <select id="priority">
+                        <option value="medium">Orta</option>
+                        <option value="low">Düşük</option>
+                        <option value="high">Yüksek</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Açıklama *</label>
+                <textarea id="description" required placeholder="Ürün/hizmet hakkında detaylı bilgi..."></textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="quantity">Miktar *</label>
+                    <input type="number" id="quantity" required min="1" placeholder="1000">
+                </div>
+                <div class="form-group">
+                    <label for="unit">Birim *</label>
+                    <select id="unit" required>
+                        <option value="">Birim seçin</option>
+                        <option value="pieces">Adet</option>
+                        <option value="kg">Kilogram</option>
+                        <option value="tons">Ton</option>
+                        <option value="liters">Litre</option>
+                        <option value="meters">Metre</option>
+                        <option value="boxes">Kutu</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="budget_min">Min. Bütçe ($)</label>
+                    <input type="number" id="budget_min" step="0.01" placeholder="5000">
+                </div>
+                <div class="form-group">
+                    <label for="budget_max">Max. Bütçe ($)</label>
+                    <input type="number" id="budget_max" step="0.01" placeholder="15000">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="deadline">Son Teklif Tarihi *</label>
+                    <input type="datetime-local" id="deadline" required>
+                </div>
+                <div class="form-group">
+                    <label for="delivery_location">Teslimat Yeri *</label>
+                    <input type="text" id="delivery_location" required placeholder="İstanbul, Türkiye">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="requirements">Özel Gereksinimler</label>
+                <textarea id="requirements" placeholder="Kalite standartları, sertifikalar, özel koşullar..."></textarea>
+            </div>
+            
+            <button type="submit">RFQ Oluştur ve Gönder</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+        
+        <div class="rfq-list">
+            <h2>📋 RFQ Listesi</h2>
+            <button type="button" id="loadRFQs">RFQ'ları Yükle</button>
+            <div id="rfqList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const TOKEN = 'header.eyJzdWIiOiAidGVzdC11c2VyLTEyMyIsICJlbWFpbCI6ICJ0ZXN0QGV4YW1wbGUuY29tIiwgIm5hbWUiOiAiVGVzdCBVc2VyIn0.signature';
+        
+        // Minimum tarih ayarla (yarın)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('deadline').min = tomorrow.toISOString().slice(0, 16);
+        
+        // Form gönderimi
+        document.getElementById('rfqForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const button = e.target.querySelector('button[type="submit"]');
+            const result = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Gönderiliyor...';
+            result.style.display = 'none';
+            
+            try {
+                const formData = new FormData(e.target);
+                const data = {
+                    title: formData.get('title'),
+                    category: formData.get('category'),
+                    priority: formData.get('priority'),
+                    description: formData.get('description'),
+                    quantity: parseInt(formData.get('quantity')),
+                    unit: formData.get('unit'),
+                    budget_min: formData.get('budget_min') ? parseFloat(formData.get('budget_min')) : null,
+                    budget_max: formData.get('budget_max') ? parseFloat(formData.get('budget_max')) : null,
+                    deadline: new Date(formData.get('deadline')).toISOString(),
+                    delivery_location: formData.get('delivery_location'),
+                    requirements: formData.get('requirements') || null
+                };
+                
+                // Collect form data manually since FormData doesn't work well with our setup
+                const inputs = e.target.querySelectorAll('input, select, textarea');
+                const formObject = {};
+                inputs.forEach(input => {
+                    if (input.type === 'number') {
+                        formObject[input.id] = input.value ? parseFloat(input.value) : null;
+                    } else if (input.type === 'datetime-local') {
+                        formObject[input.id] = new Date(input.value).toISOString();
+                    } else {
+                        formObject[input.id] = input.value || null;
+                    }
+                });
+                
+                // Override specific fields
+                formObject.quantity = parseInt(document.getElementById('quantity').value);
+                formObject.deadline = new Date(document.getElementById('deadline').value).toISOString();
+                
+                const response = await fetch(`${API_BASE}/rfqs`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${TOKEN}`
+                    },
+                    body: JSON.stringify(formObject)
+                });
+                
+                const responseData = await response.json();
+                
+                if (response.ok && responseData.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <h3>✅ RFQ Başarıyla Oluşturuldu!</h3>
+                        <p><strong>RFQ ID:</strong> ${responseData.data.rfq.id}</p>
+                        <p><strong>Başlık:</strong> ${responseData.data.rfq.title}</p>
+                        <p><strong>Durum:</strong> ${responseData.data.rfq.status}</p>
+                    `;
+                    
+                    // Workflow başlat
+                    try {
+                        const workflowResponse = await fetch(`${API_BASE}/orchestrate`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${TOKEN}`
+                            },
+                            body: JSON.stringify({
+                                job_type: 'rfq_process',
+                                rfq_id: responseData.data.rfq.id,
+                                payload: { rfq: responseData.data.rfq }
+                            })
+                        });
+                        
+                        const workflowData = await workflowResponse.json();
+                        if (workflowResponse.ok && workflowData.success) {
+                            result.innerHTML += `
+                                <div class="info" style="margin-top: 10px; padding: 10px; background: #d1ecf1; border-radius: 4px;">
+                                    🤖 <strong>Agent Workflow Başlatıldı!</strong><br>
+                                    Job ID: ${workflowData.data.job_id}
+                                </div>
+                            `;
+                        }
+                    } catch (workflowError) {
+                        console.log('Workflow error:', workflowError);
+                    }
+                    
+                    e.target.reset();
+                } else {
+                    throw new Error(responseData.message || responseData.detail || 'Bilinmeyen hata');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `
+                    <h3>❌ Hata</h3>
+                    <p>${error.message}</p>
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'RFQ Oluştur ve Gönder';
+                result.style.display = 'block';
+            }
+        });
+        
+        // RFQ listesini yükle
+        document.getElementById('loadRFQs').addEventListener('click', async () => {
+            const button = document.getElementById('loadRFQs');
+            const listContainer = document.getElementById('rfqList');
+            
+            button.disabled = true;
+            button.textContent = 'Yükleniyor...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/rfqs`, {
+                    headers: {
+                        'Authorization': `Bearer ${TOKEN}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    if (data.data.length === 0) {
+                        listContainer.innerHTML = '<p>Henüz RFQ bulunmuyor.</p>';
+                    } else {
+                        listContainer.innerHTML = data.data.map(rfq => `
+                            <div class="rfq-item">
+                                <h4>${rfq.title}</h4>
+                                <p><strong>Kategori:</strong> ${rfq.category}</p>
+                                <p><strong>Miktar:</strong> ${rfq.quantity} ${rfq.unit}</p>
+                                <p><strong>Durum:</strong> ${rfq.status}</p>
+                                <p><strong>Öncelik:</strong> ${rfq.priority}</p>
+                                <p><strong>Oluşturulma:</strong> ${new Date(rfq.created_at).toLocaleString('tr-TR')}</p>
+                            </div>
+                        `).join('');
+                    }
+                } else {
+                    throw new Error(data.message || 'RFQ listesi yüklenemedi');
+                }
+            } catch (error) {
+                listContainer.innerHTML = `<p style="color: red;">Hata: ${error.message}</p>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'RFQ\'ları Yükle';
+            }
+        });
+    </script>
+</body>
+</html>

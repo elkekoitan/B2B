@@ -1,0 +1,174 @@
+2025-08-24 15:52:22.094 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:22.098 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:22.099 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:22.100 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:22.101 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:22.101 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:22.102 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:22.103 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:22.103 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:22.105 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:22.530 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:22.531 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:52:29.589 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:29.591 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:29.592 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:29.592 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:29.592 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:29.593 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:29.593 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:29.593 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:29.594 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:29.594 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:29.832 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:29.833 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:52:32.139 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:32.141 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:32.142 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:32.142 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:32.143 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:32.143 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:32.143 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:32.144 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:32.144 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:32.145 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:32.168 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:32.169 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:52:35.007 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:35.009 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:35.010 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:35.010 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:35.010 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:35.011 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:35.011 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:35.011 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:35.012 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:35.012 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:35.014 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:35.015 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:51:03.181 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:51:03.187 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:51:03.187 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:51:03.188 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:51:03.188 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:51:03.188 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:51:03.189 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:51:03.189 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:51:03.190 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:51:03.190 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:40.561 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:40.562 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:52:44.522 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:44.525 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:44.526 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:44.526 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:44.527 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:44.527 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:44.528 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:44.528 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:44.529 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:44.530 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:44.660 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:44.661 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:52:49.106 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:49.110 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:49.110 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:49.111 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:49.111 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:49.112 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:49.112 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:49.113 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:49.113 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:49.114 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:49.117 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:49.118 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:52:57.721 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:52:57.723 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:52:57.724 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:52:57.724 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:52:57.724 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:52:57.725 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:52:57.725 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:52:57.726 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:52:57.726 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:52:57.727 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:52:58.075 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:52:58.076 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:53:13.242 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:53:13.245 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:53:13.245 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:53:13.246 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:53:13.246 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:53:13.246 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:53:13.247 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:53:13.247 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:53:13.248 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:53:13.248 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:53:13.250 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:53:13.251 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:53:40.305 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:53:40.308 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:53:40.308 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:53:40.309 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:53:40.309 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:53:40.309 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:53:40.310 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:53:40.310 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:53:40.310 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:53:40.311 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:53:40.397 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:53:40.398 | ERROR    | __main__:<module>:56 - Application crashed: Invalid API key
+2025-08-24 15:54:32.402 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-24 15:54:32.405 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-24 15:54:32.405 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-24 15:54:32.405 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-24 15:54:32.406 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-24 15:54:32.406 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-24 15:54:32.407 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://demo-project.supabase.co
+2025-08-24 15:54:32.407 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-24 15:54:32.407 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-24 15:54:32.408 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-24 15:54:32.480 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-24 15:54:32.481 | INFO     | agents:__init__:33 - [rfq_intake] Initializing agent with mock database client
+2025-08-24 15:54:32.481 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-24 15:54:32.482 | INFO     | agents:__init__:33 - [supplier_discovery] Initializing agent with mock database client
+2025-08-24 15:54:32.482 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-24 15:54:32.482 | INFO     | agents:__init__:33 - [email_send] Initializing agent with mock database client
+2025-08-24 15:54:32.483 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-24 15:54:32.483 | INFO     | agents:__init__:33 - [inbox_parser] Initializing agent with mock database client
+2025-08-24 15:54:32.484 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-24 15:54:32.484 | INFO     | agents:__init__:33 - [supplier_verifier] Initializing agent with mock database client
+2025-08-24 15:54:32.485 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-24 15:54:32.485 | INFO     | agents:__init__:33 - [aggregation_report] Initializing agent with mock database client
+2025-08-24 15:54:32.486 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-24 15:54:32.488 | INFO     | __main__:main:18 - Health check: {'orchestrator': {'running': False, 'agents_count': 6, 'timestamp': '2025-08-24T15:54:32.486548'}, 'agents': {'rfq_intake': {'status': 'healthy', 'queue_size': 0}, 'supplier_discovery': {'status': 'healthy', 'queue_size': 0}, 'email_send': {'status': 'healthy', 'queue_size': 0}, 'inbox_parser': {'status': 'healthy', 'queue_size': 0}, 'supplier_verifier': {'status': 'healthy', 'queue_size': 0}, 'aggregation_report': {'status': 'healthy', 'queue_size': 0}}, 'redis': {'status': 'healthy', 'connected': True}}
+2025-08-24 15:54:32.488 | INFO     | __main__:main:26 - Agent Orchestrator is starting...
+2025-08-24 15:54:32.489 | INFO     | orchestrator:start:45 - Starting Agent Orchestrator...
+2025-08-24 15:54:32.489 | INFO     | orchestrator:_process_main_jobs:70 - Started main job processor
+2025-08-25 00:25:46.035 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-25 00:25:46.038 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-25 00:25:46.038 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-25 00:25:46.038 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-25 00:25:46.039 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-25 00:25:46.039 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-25 00:25:46.040 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://axruesovbkcrejdczqhw.supabase.co
+2025-08-25 00:25:46.041 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Set
+2025-08-25 00:25:46.041 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-25 00:25:46.042 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-25 00:25:46.046 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-25 00:25:46.047 | INFO     | agents:__init__:33 - [rfq_intake] Initializing agent with mock database client
+2025-08-25 00:25:46.047 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 00:25:46.048 | INFO     | agents:__init__:33 - [supplier_discovery] Initializing agent with mock database client
+2025-08-25 00:25:46.048 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 00:25:46.048 | INFO     | agents:__init__:33 - [email_send] Initializing agent with mock database client
+2025-08-25 00:25:46.049 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 00:25:46.049 | INFO     | agents:__init__:33 - [inbox_parser] Initializing agent with mock database client
+2025-08-25 00:25:46.050 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 00:25:46.050 | INFO     | agents:__init__:33 - [supplier_verifier] Initializing agent with mock database client
+2025-08-25 00:25:46.050 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 00:25:46.051 | INFO     | agents:__init__:33 - [aggregation_report] Initializing agent with mock database client
+2025-08-25 00:25:46.051 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 00:25:46.052 | INFO     | __main__:main:18 - Health check: {'orchestrator': {'running': False, 'agents_count': 6, 'timestamp': '2025-08-25T00:25:46.051970'}, 'agents': {'rfq_intake': {'status': 'healthy', 'queue_size': 0}, 'supplier_discovery': {'status': 'healthy', 'queue_size': 0}, 'email_send': {'status': 'healthy', 'queue_size': 0}, 'inbox_parser': {'status': 'healthy', 'queue_size': 0}, 'supplier_verifier': {'status': 'healthy', 'queue_size': 0}, 'aggregation_report': {'status': 'healthy', 'queue_size': 0}}, 'redis': {'status': 'healthy', 'connected': True}}
+2025-08-25 00:25:46.053 | INFO     | __main__:main:26 - Agent Orchestrator is starting...
+2025-08-25 00:25:46.053 | INFO     | orchestrator:start:45 - Starting Agent Orchestrator...
+2025-08-25 00:25:46.054 | INFO     | orchestrator:_process_main_jobs:70 - Started main job processor

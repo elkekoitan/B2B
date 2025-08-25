@@ -1,0 +1,34 @@
+name: Supabase DB Migrate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'supabase/migrations/**.sql'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Apply migrations in order
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          FILES=(supabase/migrations/*.sql)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No migration files found. Skipping."
+            exit 0
+          fi
+          for f in $(ls -1 supabase/migrations/*.sql | sort); do
+            echo "Applying $f"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+

@@ -1,0 +1,2 @@
+2025-08-25 00:58:20.549 | ERROR    | app.auth:_get_jwks:36 - Failed to fetch JWKS: 401 Client Error: Unauthorized for url: https://axruesovbkcrejdczqhw.supabase.co/auth/v1/keys
+2025-08-25 00:58:20.644 | ERROR    | app.auth:_get_jwks:36 - Failed to fetch JWKS: 401 Client Error: Unauthorized for url: https://axruesovbkcrejdczqhw.supabase.co/auth/v1/keys
