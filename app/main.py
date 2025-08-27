@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, Query, Path, BackgroundTask
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
+import json
 import os
 from datetime import datetime, timedelta
 from loguru import logger
@@ -15,9 +16,10 @@ from app.models import (
     Offer, OfferCreate, OfferListResponse,
     JobCreate, JobResponse, JobStatus,
     BaseResponse, HealthCheckResponse,
-    RFQAnalytics, OfferComparison
+    RFQAnalytics, OfferComparison,
+    CatalogCreate, CatalogUpdate, CatalogItem, CatalogListResponse,
 )
-from app.auth import get_current_user, get_current_user_optional, require_admin
+from app.auth import get_current_user, get_current_user_optional, require_admin, require_permission
 from app.services.supplier_discovery import SupplierDiscoveryService
 
 # Configure logging
@@ -36,13 +38,196 @@ app = FastAPI(
 supplier_discovery = SupplierDiscoveryService()
 
 # Configure CORS
+_env = os.getenv("ENVIRONMENT", "development").lower()
+_origins_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("CORS_ALLOW_ORIGINS")
+if _origins_env:
+    _origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
+else:
+    _origins = ["*"] if _env != "production" else []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual domains
+    allow_origins=_origins if _origins else ["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Orchestrator (simple) endpoints using Redis jobs
+from pydantic import BaseModel
+
+class OrchestrateRequest(BaseModel):
+    job_type: str
+    rfq_id: Optional[str] = None
+    payload: Dict[str, Any] = {}
+
+@app.delete("/orchestrate/{job_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "cancel"))])
+async def orchestrate_cancel(job_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        st = redis_client.get_job_status(job_id)
+        if not st:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if st.get("user_id") != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        cancelled = False
+        try:
+            cancelled = redis_client.cancel_job(job_id)
+        except Exception as e:
+            logger.warning(f"cancel_job failed: {e}")
+        return BaseResponse(success=True, message="Job cancelled" if cancelled else "Job marked as failed", data={"job_id": job_id})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Cancel failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/orchestrate", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "start"))])
+async def orchestrate_job(req: OrchestrateRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        job_payload = {"rfq_id": req.rfq_id, **(req.payload or {})}
+        # RFQ sağlama ve payload'a ekleme (varsa)
+        if req.rfq_id:
+            rfq_resp = supabase.table("rfqs").select("*").eq("id", req.rfq_id).eq("requester_id", current_user["user_id"]).maybe_single().execute()
+            if not rfq_resp.data:
+                raise HTTPException(status_code=404, detail="RFQ not found")
+            job_payload["rfq"] = rfq_resp.data
+            # RFQ durumunu güncelle (best-effort)
+            try:
+                supabase.table("rfqs").update({
+                    "status": "in_progress",
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("id", req.rfq_id).execute()
+            except Exception as e:
+                logger.warning(f"RFQ status update failed: {e}")
+        job_id = redis_client.create_job(req.job_type, job_payload, current_user["user_id"])
+        # record mapping for recent jobs
+        try:
+            redis_client.record_user_job(current_user["user_id"], job_id)
+        except Exception as e:
+            logger.warning(f"record_user_job failed: {e}")
+        # persist job row (best-effort) in Supabase
+        try:
+            supabase.table("jobs").insert({
+                "id": job_id,
+                "user_id": current_user["user_id"],
+                "company_id": current_user.get("metadata", {}).get("company_id"),
+                "rfq_id": req.rfq_id,
+                "job_type": req.job_type,
+                "status": "queued",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }).execute()
+        except Exception as e:
+            logger.warning(f"persist job failed: {e}")
+        return BaseResponse(success=True, message="Job enqueued", data={"job_id": job_id})
+    except Exception as e:
+        logger.error(f"Orchestrate failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/orchestrate/status/{job_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "read"))])
+async def orchestrate_status(job_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        st = redis_client.get_job_status(job_id)
+        if not st:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if st.get("user_id") != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        # best-effort persist status update
+        try:
+            supabase.table("jobs").update({
+                "status": st.get("status"),
+                "updated_at": datetime.utcnow().isoformat(),
+                "result": st.get("result"),
+                "error": st.get("error"),
+            }).eq("id", job_id).execute()
+        except Exception as e:
+            logger.warning(f"update job row failed: {e}")
+        return BaseResponse(success=True, data={"job": st})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get status failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/orchestrate/recent", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "read"))])
+async def orchestrate_recent(
+    limit: int = Query(10, ge=1, le=50),
+    job_type: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        jobs = []
+        try:
+            jobs = redis_client.list_user_jobs(current_user["user_id"], limit=limit)
+        except Exception as e:
+            logger.warning(f"list_user_jobs failed: {e}")
+        if job_type:
+            jobs = [j for j in jobs if j.get("job_type") == job_type]
+        return BaseResponse(success=True, data={"jobs": jobs})
+    except Exception as e:
+        logger.error(f"Recent jobs failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/orchestrate/history", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "read"))])
+async def orchestrate_history(
+    limit: int = Query(20, ge=1, le=100),
+    job_type: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """List persisted jobs from Supabase (if available)."""
+    try:
+        rows = []
+        try:
+            query = supabase.table("jobs").select("*").eq("user_id", current_user["user_id"]).order("updated_at", desc=True).limit(limit)
+            if job_type:
+                query = query.eq("job_type", job_type)
+            resp = query.execute()
+            rows = resp.data or []
+        except Exception as e:
+            logger.warning(f"history fetch failed: {e}")
+        return BaseResponse(success=True, data={"jobs": rows})
+    except Exception as e:
+        logger.error(f"History failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/orchestrate/queues", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "read"))])
+async def orchestrate_queues(current_user: dict = Depends(get_current_user)):
+    """Return snapshot of orchestrator queues to aid visibility and debugging."""
+    try:
+        snapshot = {"main": 0, "agents": {}}
+        r = getattr(redis_client, 'redis', None)
+        if r is not None and hasattr(r, 'llen'):
+            snapshot["main"] = r.llen('agentik:jobs')
+            for q in [
+                'rfq_intake', 'supplier_discovery', 'email_send',
+                'inbox_parser', 'supplier_verifier', 'aggregation_report'
+            ]:
+                try:
+                    snapshot["agents"][q] = r.llen(f'agentik:agent:{q}')
+                except Exception:
+                    snapshot["agents"][q] = None
+        return BaseResponse(success=True, data=snapshot)
+    except Exception as e:
+        logger.error(f"Queue snapshot failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/orchestrate/heartbeat", response_model=BaseResponse, dependencies=[Depends(require_permission("workflow", "read"))])
+async def orchestrate_heartbeat(current_user: dict = Depends(get_current_user)):
+    """Return last heartbeat published by the agent orchestrator (if any)."""
+    try:
+        hb = None
+        try:
+            r = getattr(redis_client, 'redis', None)
+            if r is not None and hasattr(r, 'get'):
+                raw = r.get('agentik:heartbeat')
+                if raw:
+                    hb = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception as e:
+            logger.warning(f"read heartbeat failed: {e}")
+        return BaseResponse(success=True, data={"heartbeat": hb, "available": hb is not None})
+    except Exception as e:
+        logger.error(f"Heartbeat read failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Health check endpoint
 @app.get("/health", response_model=HealthCheckResponse)
@@ -53,27 +238,98 @@ async def health_check():
     # Check Supabase
     supabase_health = await supabase_client.health_check()
     
-    # Check Redis
+    # Check Redis + queue metrics (best-effort)
     redis_health = redis_client.health_check()
+    try:
+        # Try to read main queue length and agent queues
+        r = getattr(redis_client, 'redis', None)
+        if r is not None and hasattr(r, 'llen'):
+            q_main = r.llen('agentik:jobs')
+            queues = {
+                'main': q_main,
+            }
+            for q in [
+                'rfq_intake', 'supplier_discovery', 'email_send',
+                'inbox_parser', 'supplier_verifier', 'aggregation_report'
+            ]:
+                try:
+                    queues[q] = r.llen(f'agentik:agent:{q}')
+                except Exception:
+                    pass
+            if isinstance(redis_health, dict):
+                redis_health["queues"] = queues
+    except Exception as e:
+        logger.warning(f"queue metrics failed: {e}")
     
+    # Orchestrator heartbeat (best-effort)
+    orchestrator_health = {"status": "unknown"}
+    try:
+        r = getattr(redis_client, 'redis', None)
+        if r is not None and hasattr(r, 'get'):
+            raw = r.get('agentik:heartbeat')
+            if raw:
+                hb = json.loads(raw) if isinstance(raw, str) else raw
+                orchestrator_health = {"status": "healthy", "last_seen": hb.get("ts"), "queues": hb.get("queues")}
+            else:
+                orchestrator_health = {"status": "unavailable"}
+    except Exception as e:
+        logger.warning(f"orchestrator heartbeat read failed: {e}")
+        orchestrator_health = {"status": "unavailable"}
+
     # Overall status
     overall_status = "healthy" if all([
         supabase_health["status"] == "healthy",
         redis_health["status"] == "healthy"
     ]) else "unhealthy"
     
+    # Optional: jobs metrics (best-effort)
+    jobs_metrics = {}
+    try:
+        resp = supabase.table("jobs").select("*").limit(200).execute()
+        rows = resp.data or []
+        total = len(rows)
+        def c(st):
+            return sum(1 for r in rows if (r.get("status") or "").lower() == st)
+        jobs_metrics = {
+            "total": total,
+            "queued": c("queued"),
+            "in_progress": c("in_progress"),
+            "completed": c("completed"),
+            "failed": c("failed"),
+        }
+    except Exception as e:
+        logger.warning(f"jobs metrics failed: {e}")
+
     return HealthCheckResponse(
         status=overall_status,
         timestamp=timestamp,
         services={
             "supabase": supabase_health,
             "redis": redis_health,
-            "api": {"status": "healthy", "version": "1.0.0"}
+            "api": {"status": "healthy", "version": "1.0.0"},
+            "orchestrator": orchestrator_health,
+            "jobs": jobs_metrics,
         }
     )
 
+# Basic API info (used by smoke script)
+@app.get("/api/v1/info", response_model=BaseResponse)
+async def api_info():
+    try:
+        data = {
+            "name": "Agentik B2B API",
+            "version": "1.0.0",
+            "environment": _env,
+            "docs_url": app.docs_url,
+            "redoc_url": app.redoc_url,
+        }
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        logger.warning(f"api_info failed: {e}")
+        return BaseResponse(success=True, data={"name": "Agentik B2B API"})
+
 # RFQ Endpoints
-@app.post("/rfqs", response_model=BaseResponse)
+@app.post("/rfqs", response_model=BaseResponse, dependencies=[Depends(require_permission("rfq", "create"))])
 async def create_rfq(
     rfq: RFQCreate,
     current_user: dict = Depends(get_current_user)
@@ -136,12 +392,14 @@ async def create_rfq(
         logger.error(f"RFQ creation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/rfqs", response_model=RFQListResponse)
+@app.get("/rfqs", response_model=RFQListResponse, dependencies=[Depends(require_permission("rfq", "read"))])
 async def list_rfqs(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query("created_at"),
+    sort_dir: Optional[str] = Query("desc"),
     current_user: dict = Depends(get_current_user)
 ):
     """List user's RFQs with pagination and filtering"""
@@ -155,6 +413,13 @@ async def list_rfqs(
         if category:
             query = query.eq("category", category)
         
+        # Sorting (allowlist)
+        sort_field = (sort_by or "created_at").lower()
+        allowed = {"created_at", "updated_at", "deadline_date"}
+        if sort_field not in allowed:
+            sort_field = "created_at"
+        descending = (sort_dir or "desc").lower() != "asc"
+        
         # Get total count
         count_response = supabase.table("rfqs").select("id", count="exact").eq("requester_id", current_user["user_id"])
         if status:
@@ -167,7 +432,7 @@ async def list_rfqs(
         
         # Get paginated results
         offset = (page - 1) * per_page
-        response = query.order("created_at", desc=True).range(offset, offset + per_page - 1).execute()
+        response = query.order(sort_field, desc=descending).range(offset, offset + per_page - 1).execute()
         
         rfqs = [RFQ(**item) for item in response.data] if response.data else []
         
@@ -292,6 +557,7 @@ async def get_comparison_report(
     except Exception as e:
         logger.error(f"Comparison report generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/rfqs/{rfq_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("rfq", "read"))])
 async def get_rfq(
     rfq_id: str = Path(...),
     current_user: dict = Depends(get_current_user)
@@ -324,7 +590,7 @@ async def get_rfq(
         logger.error(f"RFQ retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/rfqs/{rfq_id}", response_model=BaseResponse)
+@app.put("/rfqs/{rfq_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("rfq", "update"))])
 async def update_rfq(
     rfq_id: str = Path(...),
     rfq_update: RFQUpdate = Body(...),
@@ -367,7 +633,7 @@ async def update_rfq(
         logger.error(f"RFQ update failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/rfqs/{rfq_id}", response_model=BaseResponse)
+@app.delete("/rfqs/{rfq_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("rfq", "delete"))])
 async def delete_rfq(
     rfq_id: str = Path(...),
     current_user: dict = Depends(get_current_user)
@@ -396,8 +662,126 @@ async def delete_rfq(
         logger.error(f"RFQ deletion failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Catalog Endpoints
+@app.get("/catalog/mine", response_model=CatalogListResponse, dependencies=[Depends(require_permission("catalog", "read"))])
+async def list_my_catalog(
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    currency: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        # Base query
+        query = supabase.table("supplier_products").select("*", count="exact").eq("supplier_id", current_user["user_id"]).order("updated_at", desc=True)
+        # Execute base to get rows and count
+        resp = query.execute()
+        rows = resp.data or []
+        # Client-side filtering for search/category/currency
+        if category:
+            rows = [r for r in rows if (r.get("category") or "").lower() == category.lower()]
+        if currency:
+            rows = [r for r in rows if (r.get("currency") or "").upper() == currency.upper()]
+        if search:
+            s = search.lower()
+            rows = [r for r in rows if s in (r.get("product_name") or "").lower()]
+        total = len(rows)
+        # Pagination
+        start = (page - 1) * size
+        paged = rows[start:start + size]
+        items = [CatalogItem(**{
+            "id": r.get("id"),
+            "supplier_id": r.get("supplier_id") or current_user["user_id"],
+            "product_name": r.get("product_name"),
+            "category": r.get("category"),
+            "price": r.get("price"),
+            "currency": r.get("currency") or "USD",
+            "created_at": datetime.fromisoformat(r.get("created_at")) if isinstance(r.get("created_at"), str) else r.get("created_at") or datetime.utcnow(),
+            "updated_at": datetime.fromisoformat(r.get("updated_at")) if isinstance(r.get("updated_at"), str) else r.get("updated_at"),
+        }) for r in paged]
+        return CatalogListResponse(success=True, data=items, total=total)
+    except Exception as e:
+        logger.error(f"List my catalog failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/catalog/supplier/{supplier_id}", response_model=CatalogListResponse, dependencies=[Depends(require_permission("catalog", "read"))])
+async def list_catalog_by_supplier(
+    supplier_id: str,
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    currency: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        query = supabase.table("supplier_products").select("*", count="exact").eq("supplier_id", supplier_id).order("updated_at", desc=True)
+        resp = query.execute()
+        rows = resp.data or []
+        if category:
+            rows = [r for r in rows if (r.get("category") or "").lower() == category.lower()]
+        if currency:
+            rows = [r for r in rows if (r.get("currency") or "").upper() == currency.upper()]
+        if search:
+            s = search.lower()
+            rows = [r for r in rows if s in (r.get("product_name") or "").lower()]
+        total = len(rows)
+        start = (page - 1) * size
+        paged = rows[start:start + size]
+        items = [CatalogItem(**{
+            "id": r.get("id"),
+            "supplier_id": r.get("supplier_id") or supplier_id,
+            "product_name": r.get("product_name"),
+            "category": r.get("category"),
+            "price": r.get("price"),
+            "currency": r.get("currency") or "USD",
+            "created_at": datetime.fromisoformat(r.get("created_at")) if isinstance(r.get("created_at"), str) else r.get("created_at") or datetime.utcnow(),
+            "updated_at": datetime.fromisoformat(r.get("updated_at")) if isinstance(r.get("updated_at"), str) else r.get("updated_at"),
+        }) for r in paged]
+        return CatalogListResponse(success=True, data=items, total=total)
+    except Exception as e:
+        logger.error(f"List supplier catalog failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/catalog", response_model=BaseResponse, dependencies=[Depends(require_permission("catalog", "create"))])
+async def create_catalog_item(item: CatalogCreate, current_user: dict = Depends(get_current_user)):
+    try:
+        data = item.dict(exclude_unset=True)
+        data["supplier_id"] = data.get("supplier_id") or current_user["user_id"]
+        data["created_at"] = datetime.utcnow().isoformat()
+        data["updated_at"] = datetime.utcnow().isoformat()
+        resp = supabase.table("supplier_products").insert(data).execute()
+        created = resp.data[0] if resp and resp.data else data
+        return BaseResponse(success=True, message="Catalog item created", data={"item": created})
+    except Exception as e:
+        logger.error(f"Create catalog item failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/catalog/{item_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("catalog", "update"))])
+async def update_catalog_item(item_id: str, updates: CatalogUpdate, current_user: dict = Depends(get_current_user)):
+    try:
+        data = updates.dict(exclude_unset=True)
+        if data:
+            data["updated_at"] = datetime.utcnow().isoformat()
+        resp = supabase.table("supplier_products").update(data).eq("id", item_id).execute()
+        updated = resp.data[0] if resp and resp.data else None
+        return BaseResponse(success=True, message="Catalog item updated" if updated else "No changes", data={"item": updated})
+    except Exception as e:
+        logger.error(f"Update catalog item failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/catalog/{item_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("catalog", "delete"))])
+async def delete_catalog_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        supabase.table("supplier_products").delete().eq("id", item_id).execute()
+        return BaseResponse(success=True, message="Catalog item deleted")
+    except Exception as e:
+        logger.error(f"Delete catalog item failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Supplier Endpoints
-@app.get("/suppliers", response_model=SupplierListResponse)
+@app.get("/suppliers", response_model=SupplierListResponse, dependencies=[Depends(require_permission("supplier", "read"))])
 async def list_suppliers(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
@@ -474,7 +858,7 @@ async def create_supplier(
         raise HTTPException(status_code=500, detail=str(e))
 
 # Offer Endpoints
-@app.get("/offers", response_model=OfferListResponse)
+@app.get("/offers", response_model=OfferListResponse, dependencies=[Depends(require_permission("offer", "read"))])
 async def list_offers(
     rfq_id: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user)
@@ -513,7 +897,7 @@ async def list_offers(
         logger.error(f"Offer listing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/offers/by-rfq/{rfq_id}", response_model=BaseResponse)
+@app.get("/offers/by-rfq/{rfq_id}", response_model=BaseResponse, dependencies=[Depends(require_permission("offer", "read"))])
 async def get_offers_by_rfq(
     rfq_id: str = Path(...),
     current_user: dict = Depends(get_current_user)
@@ -558,89 +942,8 @@ async def get_offers_by_rfq(
         logger.error(f"Offers retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Agent Orchestration Endpoints
-@app.post("/orchestrate", response_model=BaseResponse)
-async def trigger_agent_workflow(
-    job: JobCreate,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
-):
-    """Trigger agent workflow for RFQ processing"""
-    try:
-        # Verify RFQ belongs to user
-        rfq_response = supabase.table("rfqs").select("*").eq("id", job.rfq_id).eq("requester_id", current_user["user_id"]).maybe_single().execute()
-        if not rfq_response.data:
-            raise HTTPException(status_code=404, detail="RFQ not found")
-        
-        rfq = rfq_response.data
-        
-        # Create job in Redis queue
-        job_payload = {
-            "rfq": rfq,
-            "user_id": current_user["user_id"],
-            **job.payload
-        }
-        
-        job_id = redis_client.create_job(
-            job_type=job.job_type,
-            payload=job_payload,
-            user_id=current_user["user_id"]
-        )
-        
-        # Update RFQ status
-        supabase.table("rfqs").update({
-            "status": "in_progress",
-            "updated_at": datetime.utcnow().isoformat()
-        }).eq("id", job.rfq_id).execute()
-        
-        logger.info(f"Started agent workflow {job_id} for RFQ {job.rfq_id}")
-        
-        return BaseResponse(
-            success=True,
-            message="Agent workflow started successfully",
-            data={
-                "job_id": job_id,
-                "status": "queued",
-                "rfq_id": job.rfq_id
-            }
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Workflow trigger failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/status/{job_id}", response_model=JobResponse)
-async def get_job_status(
-    job_id: str = Path(...),
-    current_user: dict = Depends(get_current_user)
-):
-    """Get job status and results"""
-    try:
-        job_data = redis_client.get_job_status(job_id)
-        
-        if not job_data:
-            raise HTTPException(status_code=404, detail="Job not found")
-        
-        # Verify job belongs to user
-        if job_data["data"].get("user_id") != current_user["user_id"]:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
-        return JobResponse(
-            job_id=job_id,
-            status=JobStatus(job_data["status"]),
-            created_at=datetime.fromisoformat(job_data["created_at"]),
-            updated_at=datetime.fromisoformat(job_data["updated_at"]) if job_data["updated_at"] else None,
-            result=job_data["result"],
-            error=job_data["error"]
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Job status retrieval failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+## Agent Orchestration
+# Tek giriş noktaları: POST /orchestrate ve GET /orchestrate/status/{job_id}
 
 # Analytics Endpoints
 @app.get("/analytics/rfqs", response_model=BaseResponse)
@@ -681,6 +984,64 @@ async def get_rfq_analytics(
         
     except Exception as e:
         logger.error(f"Analytics retrieval failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analytics/jobs", response_model=BaseResponse)
+async def get_jobs_analytics(
+    days: int = Query(7, ge=1, le=30),
+    current_user: dict = Depends(get_current_user)
+):
+    """Return timeseries of job status counts for the last N days and queue snapshot."""
+    try:
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        days_list = [(now - timedelta(days=i)).date().isoformat() for i in range(days-1, -1, -1)]
+        series = {"queued": [0]*days, "in_progress": [0]*days, "completed": [0]*days, "failed": [0]*days}
+
+        rows = []
+        try:
+            resp = supabase.table("jobs").select("*").execute()
+            rows = resp.data or []
+        except Exception as e:
+            logger.warning(f"jobs analytics fetch failed: {e}")
+
+        for r in rows:
+            ts = r.get("updated_at") or r.get("created_at")
+            st = (r.get("status") or "").lower()
+            if not ts:
+                continue
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                d = dt.date().isoformat()
+                if d in days_list and st in series:
+                    idx = days_list.index(d)
+                    series[st][idx] += 1
+            except Exception:
+                continue
+
+        queues = {}
+        try:
+            r = getattr(redis_client, 'redis', None)
+            if r is not None and hasattr(r, 'llen'):
+                queues["main"] = r.llen('agentik:jobs')
+                for q in [
+                    'rfq_intake', 'supplier_discovery', 'email_send',
+                    'inbox_parser', 'supplier_verifier', 'aggregation_report'
+                ]:
+                    try:
+                        queues[q] = r.llen(f'agentik:agent:{q}')
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"queue snapshot failed: {e}")
+
+        return BaseResponse(success=True, data={
+            "days": days_list,
+            "series": series,
+            "queues": queues,
+        })
+    except Exception as e:
+        logger.error(f"Jobs analytics failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Admin Endpoints
