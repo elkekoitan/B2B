@@ -105,6 +105,7 @@ ASCII alternatif (hızlı bakış):
 - Frontend: Catalog sayfasına kategori/para birimi filtreleri eklendi
 - Orchestrate (local): `POST /orchestrate` ve `GET /orchestrate/status/{job_id}` ile basit job akışı
 - Backend Testleri: Orchestrate görünürlük testleri eklendi (`/orchestrate/queues`, `/orchestrate/heartbeat`)
+- Catalog API (min): `/catalog` CRUD + `/catalog/mine` ve `/catalog/supplier/{id}` uçları eklendi (filtre/paginasyon basit)
 
 ## 🔄 Devam Eden
 - Katalog sayfası: düzenleme/paginasyon/filtreler (frontend)
@@ -115,6 +116,7 @@ ASCII alternatif (hızlı bakış):
 - Frontend UX cilası (validasyon, toasts, akış rehberleri)
 - Entegrasyon testlerini genişlet (catalog update/delete, verification approve)
 - (Opsiyonel) Frontend CI: build + test job
+ - Catalog entegrasyon testleri (CRUD, filtre, paginasyon)
 
 ## 🧾 Ayrıntılı Görev Listesi (Subtasks)
 
