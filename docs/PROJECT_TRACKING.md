@@ -106,6 +106,7 @@ ASCII alternatif (hızlı bakış):
 - Orchestrate (local): `POST /orchestrate` ve `GET /orchestrate/status/{job_id}` ile basit job akışı
 - Backend Testleri: Orchestrate görünürlük testleri eklendi (`/orchestrate/queues`, `/orchestrate/heartbeat`)
 - Catalog API (min): `/catalog` CRUD + `/catalog/mine` ve `/catalog/supplier/{id}` uçları eklendi (filtre/paginasyon basit)
+- Utils: `/utils/upload` (multipart) eklendi; frontend doğrulama yüklemelerini açar
 
 ## 🔄 Devam Eden
 - Katalog sayfası: düzenleme/paginasyon/filtreler (frontend)
