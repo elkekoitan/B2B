@@ -1,1 +1,285 @@
-from fastapi import APIRouter, Depends, HTTPException, status\nfrom typing import List, Optional\nfrom uuid import UUID\n\nfrom app.core.auth import get_current_user_profile, get_optional_user\nfrom app.core.database import get_db\nfrom app.models.supplier import Supplier, SupplierCreate, SupplierUpdate\nfrom app.models.common import APIResponse, PaginatedResponse, FilterParams\nfrom supabase import Client\nfrom loguru import logger\n\nrouter = APIRouter()\n\n@router.get(\"\", response_model=APIResponse[PaginatedResponse[Supplier]])\nasync def get_suppliers(\n    params: FilterParams = Depends(),\n    industry: Optional[str] = None,\n    verified: Optional[bool] = None,\n    min_rating: Optional[float] = None,\n    current_user = Depends(get_optional_user),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Tedarikçi listesini getir\"\"\"\n    try:\n        # Query builder\n        query = db.table(\"suppliers\").select(\n            \"*\", \n            \"companies(*)\"\n        )\n        \n        # Filters\n        if industry:\n            query = query.eq(\"companies.industry\", industry)\n        if verified is not None:\n            query = query.eq(\"verified\", verified)\n        if min_rating:\n            query = query.gte(\"rating\", min_rating)\n        if params.search:\n            query = query.or_(f\"companies.name.ilike.%{params.search}%,specializations.cs.{{{params.search}}}\")\n        \n        # Pagination\n        offset = (params.page - 1) * params.size\n        query = query.range(offset, offset + params.size - 1)\n        \n        # Sorting\n        if params.sort_by:\n            ascending = params.sort_order == \"asc\"\n            query = query.order(params.sort_by, desc=not ascending)\n        else:\n            query = query.order(\"rating\", desc=True)\n        \n        # Execute query\n        result = query.execute()\n        \n        # Get total count\n        count_query = db.table(\"suppliers\").select(\"id\", count=\"exact\")\n        if industry:\n            count_query = count_query.eq(\"companies.industry\", industry)\n        if verified is not None:\n            count_query = count_query.eq(\"verified\", verified)\n        if min_rating:\n            count_query = count_query.gte(\"rating\", min_rating)\n        \n        count_result = count_query.execute()\n        total = count_result.count or 0\n        \n        has_next = (params.page * params.size) < total\n        has_previous = params.page > 1\n        \n        paginated_data = PaginatedResponse(\n            data=result.data or [],\n            total=total,\n            page=params.page,\n            size=params.size,\n            has_next=has_next,\n            has_previous=has_previous\n        )\n        \n        return APIResponse(\n            success=True,\n            data=paginated_data\n        )\n        \n    except Exception as e:\n        logger.error(f\"Supplier list error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Tedarikçi listesi alınırken hata oluştu\"\n        )\n\n@router.get(\"/{supplier_id}\", response_model=APIResponse[Supplier])\nasync def get_supplier_by_id(\n    supplier_id: UUID,\n    current_user = Depends(get_optional_user),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Tek tedarikçi detayını getir\"\"\"\n    try:\n        result = db.table(\"suppliers\").select(\n            \"*\", \"companies(*)\"\n        ).eq(\"id\", str(supplier_id)).single().execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Tedarikçi bulunamadı\"\n            )\n        \n        return APIResponse(\n            success=True,\n            data=result.data\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Supplier detail error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Tedarikçi detayları alınırken hata oluştu\"\n        )\n\n@router.post(\"\", response_model=APIResponse[Supplier])\nasync def create_supplier(\n    supplier_data: SupplierCreate,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Yeni tedarikçi oluştur (kendi şirketini tedarikçi olarak kaydet)\"\"\"\n    try:\n        # Kullanıcının şirketi zaten tedarikçi mi kontrol et\n        existing_supplier = db.table(\"suppliers\").select(\"id\").eq(\n            \"company_id\", current_user[\"company_id\"]\n        ).execute()\n        \n        if existing_supplier.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Şirketiniz zaten tedarikçi olarak kayıtlı\"\n            )\n        \n        # Tedarikçi verilerini hazırla\n        create_data = supplier_data.dict()\n        create_data[\"company_id\"] = current_user[\"company_id\"]\n        \n        # Supabase'e kaydet\n        result = db.table(\"suppliers\").insert(create_data).execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Tedarikçi oluşturulamadı\"\n            )\n        \n        # Tedarikçi detaylarını getir\n        supplier_detail = db.table(\"suppliers\").select(\n            \"*\", \"companies(*)\"\n        ).eq(\"id\", result.data[0][\"id\"]).single().execute()\n        \n        return APIResponse(\n            success=True,\n            data=supplier_detail.data,\n            message=\"Tedarikçi kaydı başarıyla oluşturuldu\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Supplier creation error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Tedarikçi kaydı oluşturulurken hata oluştu\"\n        )\n\n@router.put(\"/{supplier_id}\", response_model=APIResponse[Supplier])\nasync def update_supplier(\n    supplier_id: UUID,\n    supplier_update: SupplierUpdate,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Tedarikçi bilgilerini güncelle\"\"\"\n    try:\n        # Yetki kontrolü - sadece kendi şirketinin tedarikçi profilini güncelleyebilir\n        supplier_check = db.table(\"suppliers\").select(\"company_id\").eq(\n            \"id\", str(supplier_id)\n        ).single().execute()\n        \n        if not supplier_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Tedarikçi bulunamadı\"\n            )\n        \n        if supplier_check.data[\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu tedarikçi profilini güncelleme yetkiniz yok\"\n            )\n        \n        # Update data hazırla\n        update_data = {k: v for k, v in supplier_update.dict().items() if v is not None}\n        update_data[\"updated_at\"] = \"now()\"\n        \n        # Güncelle\n        result = db.table(\"suppliers\").update(update_data).eq(\n            \"id\", str(supplier_id)\n        ).execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Tedarikçi bilgileri güncellenemedi\"\n            )\n        \n        # Güncellenmiş tedarikçiyi getir\n        updated_supplier = db.table(\"suppliers\").select(\n            \"*\", \"companies(*)\"\n        ).eq(\"id\", str(supplier_id)).single().execute()\n        \n        return APIResponse(\n            success=True,\n            data=updated_supplier.data,\n            message=\"Tedarikçi bilgileri başarıyla güncellendi\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Supplier update error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Tedarikçi bilgileri güncellenirken hata oluştu\"\n        )\n\n@router.get(\"/company/{company_id}\", response_model=APIResponse[Supplier])\nasync def get_supplier_by_company(\n    company_id: UUID,\n    current_user = Depends(get_optional_user),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Şirket ID'sine göre tedarikçi getir\"\"\"\n    try:\n        result = db.table(\"suppliers\").select(\n            \"*\", \"companies(*)\"\n        ).eq(\"company_id\", str(company_id)).single().execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Bu şirket için tedarikçi kaydı bulunamadı\"\n            )\n        \n        return APIResponse(\n            success=True,\n            data=result.data\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Supplier by company error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Tedarikçi bilgileri alınırken hata oluştu\"\n        )\n\n@router.get(\"/search/specializations\", response_model=APIResponse[List[str]])\nasync def get_specializations(\n    db: Client = Depends(get_db)\n):\n    \"\"\"Mevcut uzmanlık alanlarını getir\"\"\"\n    try:\n        result = db.rpc(\"get_all_specializations\").execute()\n        \n        specializations = result.data if result.data else []\n        \n        return APIResponse(\n            success=True,\n            data=specializations\n        )\n        \n    except Exception as e:\n        logger.error(f\"Specializations error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Uzmanlık alanları alınırken hata oluştu\"\n        )\n
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from uuid import UUID
+
+from app.core.auth import get_current_user_profile, get_optional_user
+from app.core.database import get_db
+from app.core.permissions import require_permission
+from app.models.supplier import Supplier, SupplierCreate, SupplierUpdate
+from app.models.common import APIResponse, PaginatedResponse, FilterParams
+from supabase import Client
+from loguru import logger
+
+router = APIRouter()
+
+
+@router.get("", response_model=APIResponse[PaginatedResponse[Supplier]])
+async def get_suppliers(
+    params: FilterParams = Depends(),
+    industry: Optional[str] = None,
+    verified: Optional[bool] = None,
+    min_rating: Optional[float] = None,
+    current_user = Depends(get_optional_user),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("supplier:read"))
+):
+    """Tedarikçi listesini getir"""
+    try:
+        query = db.table("suppliers").select("*", "companies(*)")
+
+        if industry:
+            query = query.eq("companies.industry", industry)
+        if verified is not None:
+            query = query.eq("verified", verified)
+        if min_rating:
+            query = query.gte("rating", min_rating)
+        if params.search:
+            query = query.or_(f"companies.name.ilike.%{params.search}%,specializations.cs.{{{params.search}}}")
+
+        offset = (params.page - 1) * params.size
+        query = query.range(offset, offset + params.size - 1)
+
+        if params.sort_by:
+            ascending = params.sort_order == "asc"
+            query = query.order(params.sort_by, desc=not ascending)
+        else:
+            query = query.order("rating", desc=True)
+
+        result = query.execute()
+
+        count_query = db.table("suppliers").select("id", count="exact")
+        if industry:
+            count_query = count_query.eq("companies.industry", industry)
+        if verified is not None:
+            count_query = count_query.eq("verified", verified)
+        if min_rating:
+            count_query = count_query.gte("rating", min_rating)
+
+        count_result = count_query.execute()
+        total = count_result.count or 0
+
+        has_next = (params.page * params.size) < total
+        has_previous = params.page > 1
+
+        paginated_data = PaginatedResponse(
+            data=result.data or [],
+            total=total,
+            page=params.page,
+            size=params.size,
+            has_next=has_next,
+            has_previous=has_previous
+        )
+
+        return APIResponse(success=True, data=paginated_data)
+
+    except Exception as e:
+        logger.error(f"Supplier list error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tedarikçi listesi alınırken hata oluştu",
+        )
+
+
+@router.get("/{supplier_id}", response_model=APIResponse[Supplier])
+async def get_supplier_by_id(
+    supplier_id: UUID,
+    current_user = Depends(get_optional_user),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("supplier:read"))
+):
+    """Tek tedarikçi detayını getir"""
+    try:
+        result = (
+            db.table("suppliers")
+            .select("*", "companies(*)")
+            .eq("id", str(supplier_id))
+            .single()
+            .execute()
+        )
+
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Tedarikçi bulunamadı"
+            )
+
+        return APIResponse(success=True, data=result.data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supplier detail error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tedarikçi detayları alınırken hata oluştu",
+        )
+
+
+@router.post("", response_model=APIResponse[Supplier])
+async def create_supplier(
+    supplier_data: SupplierCreate,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("profile:update"))
+):
+    """Yeni tedarikçi oluştur (kendi şirketini tedarikçi olarak kaydet)"""
+    try:
+        existing_supplier = (
+            db.table("suppliers")
+            .select("id")
+            .eq("company_id", current_user["company_id"])
+            .execute()
+        )
+
+        if existing_supplier.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Şirketiniz zaten tedarikçi olarak kayıtlı",
+            )
+
+        create_data = supplier_data.dict()
+        create_data["company_id"] = current_user["company_id"]
+
+        result = db.table("suppliers").insert(create_data).execute()
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tedarikçi oluşturulamadı",
+            )
+
+        supplier_detail = (
+            db.table("suppliers")
+            .select("*", "companies(*)")
+            .eq("id", result.data[0]["id"])
+            .single()
+            .execute()
+        )
+
+        return APIResponse(
+            success=True,
+            data=supplier_detail.data,
+            message="Tedarikçi kaydı başarıyla oluşturuldu",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supplier creation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tedarikçi kaydı oluşturulurken hata oluştu",
+        )
+
+
+@router.put("/{supplier_id}", response_model=APIResponse[Supplier])
+async def update_supplier(
+    supplier_id: UUID,
+    supplier_update: SupplierUpdate,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("profile:update"))
+):
+    """Tedarikçi bilgilerini güncelle"""
+    try:
+        supplier_check = (
+            db.table("suppliers")
+            .select("company_id")
+            .eq("id", str(supplier_id))
+            .single()
+            .execute()
+        )
+
+        if not supplier_check.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Tedarikçi bulunamadı"
+            )
+
+        if supplier_check.data["company_id"] != current_user["company_id"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu tedarikçi profilini güncelleme yetkiniz yok",
+            )
+
+        update_data = {k: v for k, v in supplier_update.dict().items() if v is not None}
+        update_data["updated_at"] = "now()"
+
+        result = (
+            db.table("suppliers")
+            .update(update_data)
+            .eq("id", str(supplier_id))
+            .execute()
+        )
+
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tedarikçi bilgileri güncellenemedi",
+            )
+
+        updated_supplier = (
+            db.table("suppliers").select("*", "companies(*)").eq("id", str(supplier_id)).single().execute()
+        )
+
+        return APIResponse(
+            success=True,
+            data=updated_supplier.data,
+            message="Tedarikçi bilgileri başarıyla güncellendi",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supplier update error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tedarikçi bilgileri güncellenirken hata oluştu",
+        )
+
+
+@router.get("/company/{company_id}", response_model=APIResponse[Supplier])
+async def get_supplier_by_company(
+    company_id: UUID,
+    current_user = Depends(get_optional_user),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("supplier:read"))
+):
+    """Şirket ID'sine göre tedarikçi getir"""
+    try:
+        result = (
+            db.table("suppliers").select("*", "companies(*)").eq("company_id", str(company_id)).single().execute()
+        )
+
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bu şirket için tedarikçi kaydı bulunamadı",
+            )
+
+        return APIResponse(success=True, data=result.data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Supplier by company error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tedarikçi bilgileri alınırken hata oluştu",
+        )
+
+
+@router.get("/search/specializations", response_model=APIResponse[List[str]])
+async def get_specializations(
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("supplier:read"))
+):
+    """Mevcut uzmanlık alanlarını getir"""
+    try:
+        result = db.rpc("get_all_specializations").execute()
+        specializations = result.data if result.data else []
+        return APIResponse(success=True, data=specializations)
+    except Exception as e:
+        logger.error(f"Specializations error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Uzmanlık alanları alınırken hata oluştu",
+        )
+

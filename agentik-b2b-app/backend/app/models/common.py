@@ -61,7 +61,6 @@ class Job(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     priority: int = 1
-from datetime import datetime
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 

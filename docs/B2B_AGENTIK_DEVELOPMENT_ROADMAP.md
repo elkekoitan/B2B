@@ -8,6 +8,8 @@ This comprehensive roadmap outlines the strategic development plan for the B2B A
 - Backend tests: Orchestrate visibility endpoints covered (`/orchestrate/queues`, `/orchestrate/heartbeat`, history shape).
 - Catalog API (minimal): `/catalog` CRUD, `/catalog/mine`, `/catalog/supplier/{id}` implemented to unblock UI.
 - Docs: Contributor guide (`AGENTS.md`) and tracking updates aligned with Phase 1.
+- RBAC: Multi-role authentication system implemented with role-based permissions
+- ✅ Multi-role authentication implemented
 
 ## 🎯 Current Status (Baseline)
 

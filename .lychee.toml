@@ -1,0 +1,8 @@
+max_redirects = 10
+accept = [200, 206, 429]
+exclude = [
+  "^http://localhost",
+  "^https://localhost",
+  "^mailto:",
+]
+user_agent = "lychee/ci"

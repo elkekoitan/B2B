@@ -28,6 +28,7 @@ class RFQBase(BaseModel):
     category: Optional[str] = Field(None, max_length=100)
     quantity: Optional[int] = Field(None, gt=0)
     unit: Optional[str] = Field(None, max_length=50)
+    currency: Optional[str] = Field("USD", max_length=3)
     budget_min: Optional[Decimal] = Field(None, ge=0)
     budget_max: Optional[Decimal] = Field(None, ge=0)
     deadline_date: Optional[date] = None
@@ -52,12 +53,27 @@ class RFQBase(BaseModel):
 class RFQCreate(RFQBase):
     pass
 
+class RFQCreateWithTemplate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    description: str = Field(..., min_length=10)
+    category: str = Field(..., max_length=100)
+    quantity: Optional[int] = Field(None, gt=0)
+    unit: Optional[str] = Field(None, max_length=50)
+    budget_min: Optional[Decimal] = Field(None, ge=0)
+    budget_max: Optional[Decimal] = Field(None, ge=0)
+    deadline_date: Optional[date] = None
+    delivery_location: Optional[str] = None
+    priority: RFQPriority = RFQPriority.MEDIUM
+    attachments: Optional[List[Dict[str, Any]]] = None
+    extra_fields: Dict[str, Any] = Field(default_factory=dict)
+
 class RFQUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     description: Optional[str] = Field(None, min_length=10)
     category: Optional[str] = Field(None, max_length=100)
     quantity: Optional[int] = Field(None, gt=0)
     unit: Optional[str] = Field(None, max_length=50)
+    currency: Optional[str] = Field(None, max_length=3)
     budget_min: Optional[Decimal] = Field(None, ge=0)
     budget_max: Optional[Decimal] = Field(None, ge=0)
     deadline_date: Optional[date] = None

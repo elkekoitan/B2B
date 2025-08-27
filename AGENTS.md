@@ -40,6 +40,13 @@
 - Roadmap: reference `docs/B2B_AGENTIK_DEVELOPMENT_ROADMAP.md` in PR descriptions (e.g., `[Phase 1] RBAC`, `[Phase 1] Catalog UI`).
 - PR linkage: quote the relevant section/task from `PROJECT_TRACKING.md` and update its checklist upon merge.
 
+## Role-Based Access Control (RBAC)
+- Roles: admin, buyer, supplier, manager
+- Permissions: Resource-based access control with fine-grained permissions
+- Implementation: Database-backed role management with assignment API
+- UI: Role-specific navigation and component visibility
+- ✅ Multi-role authentication implemented
+
 ## Security & Configuration Tips
 - Copy `.env.example` → `.env` (or `.env.mock` for local mock). Never commit secrets.
 - Required keys: Supabase, SMTP, Redis.

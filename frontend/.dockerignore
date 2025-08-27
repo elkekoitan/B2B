@@ -18,7 +18,6 @@ src/**/*.spec.tsx
 # Development dosyaları
 .eslintrc*
 .prettierrc*
-tsconfig.json
 jest.config.js
 
 # Build artifacts (sadece son build'i dahil et)

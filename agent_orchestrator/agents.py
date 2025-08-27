@@ -15,9 +15,7 @@ import redis
 import time
 import random
 from jinja2 import Template
-
-# Import mock database for development
-from mock_database import get_mock_client
+from supabase import create_client as _create_supabase_client
 
 # Configure logging
 logger.add("/app/logs/agents.log", rotation="1 day", retention="7 days", level="INFO")
@@ -29,9 +27,13 @@ class BaseAgent(ABC):
         self.name = name
         self.redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
         
-        # Use mock Supabase client for development
-        logger.info(f"[{name}] Initializing agent with mock database client")
-        self.supabase = get_mock_client()
+        # Initialize real Supabase client (no mocks)
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+        if not supabase_url or not supabase_key:
+            raise RuntimeError(f"[{name}] Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/ANON_KEY")
+        self.supabase = _create_supabase_client(supabase_url, supabase_key)
+        logger.info(f"[{name}] Initialized real Supabase client")
         
     @abstractmethod
     async def process(self, job_data: Dict[str, Any]) -> Dict[str, Any]:

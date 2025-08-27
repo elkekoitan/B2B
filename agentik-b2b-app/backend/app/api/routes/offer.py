@@ -1,1 +1,242 @@
-from fastapi import APIRouter, Depends, HTTPException, status\nfrom typing import List, Optional\nfrom uuid import UUID\n\nfrom app.core.auth import get_current_user_profile\nfrom app.core.database import get_db\nfrom app.models.supplier import Offer, OfferCreate, OfferUpdate, OfferStatus\nfrom app.models.common import APIResponse, PaginatedResponse, FilterParams\nfrom supabase import Client\nfrom loguru import logger\n\nrouter = APIRouter()\n\n@router.post(\"\", response_model=APIResponse[Offer])\nasync def create_offer(\n    offer_data: OfferCreate,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Teklif oluştur\"\"\"\n    try:\n        # RFQ var mı kontrol et\n        rfq_check = db.table(\"rfqs\").select(\"id\", \"status\").eq(\n            \"id\", str(offer_data.rfq_id)\n        ).single().execute()\n        \n        if not rfq_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"RFQ bulunamadı\"\n            )\n        \n        if rfq_check.data[\"status\"] not in [\"published\", \"in_review\"]:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Bu RFQ için teklif verilemez\"\n            )\n        \n        # Tedarikçi var mı kontrol et\n        supplier_check = db.table(\"suppliers\").select(\"id\", \"company_id\").eq(\n            \"id\", str(offer_data.supplier_id)\n        ).single().execute()\n        \n        if not supplier_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Tedarikçi bulunamadı\"\n            )\n        \n        # Sadece kendi şirketinin tedarikçi hesabı için teklif verebilir\n        if supplier_check.data[\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu tedarikçi hesabı için teklif verme yetkiniz yok\"\n            )\n        \n        # Daha önce bu RFQ için teklif verilmiş mi kontrol et\n        existing_offer = db.table(\"offers\").select(\"id\").eq(\n            \"rfq_id\", str(offer_data.rfq_id)\n        ).eq(\n            \"supplier_id\", str(offer_data.supplier_id)\n        ).execute()\n        \n        if existing_offer.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Bu RFQ için zaten teklifiniz bulunmaktadır\"\n            )\n        \n        # Teklif verilerini hazırla\n        create_data = offer_data.dict()\n        create_data[\"status\"] = \"draft\"\n        \n        # Supabase'e kaydet\n        result = db.table(\"offers\").insert(create_data).execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Teklif oluşturulamadı\"\n            )\n        \n        # Teklif detaylarını getir\n        offer_detail = db.table(\"offers\").select(\n            \"*\", \n            \"rfqs(*)\", \n            \"suppliers(*, companies(*))\"\n        ).eq(\"id\", result.data[0][\"id\"]).single().execute()\n        \n        return APIResponse(\n            success=True,\n            data=offer_detail.data,\n            message=\"Teklif başarıyla oluşturuldu\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Offer creation error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Teklif oluşturulurken hata oluştu\"\n        )\n\n@router.get(\"\", response_model=APIResponse[PaginatedResponse[Offer]])\nasync def get_offers(\n    params: FilterParams = Depends(),\n    status_filter: Optional[OfferStatus] = None,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Teklif listeleme (kullanıcının şirketine göre)\"\"\"\n    try:\n        # Kullanıcının rolüne göre farklı sorgular\n        query = db.table(\"offers\").select(\n            \"*\", \n            \"rfqs(*)\", \n            \"suppliers(*, companies(*))\"\n        )\n        \n        # Eğer kullanıcının şirketi tedarikçi ise, sadece kendi tekliflerini göster\n        supplier_check = db.table(\"suppliers\").select(\"id\").eq(\n            \"company_id\", current_user[\"company_id\"]\n        ).execute()\n        \n        if supplier_check.data:\n            # Tedarikçi - sadece kendi tekliflerini göster\n            query = query.eq(\"suppliers.company_id\", current_user[\"company_id\"])\n        else:\n            # Alıcı - sadece kendi RFQ'larına gelen teklifleri göster\n            query = query.eq(\"rfqs.company_id\", current_user[\"company_id\"])\n        \n        # Filters\n        if status_filter:\n            query = query.eq(\"status\", status_filter.value)\n        \n        # Search\n        if params.search:\n            query = query.ilike(\"notes\", f\"%{params.search}%\")\n        \n        # Pagination\n        offset = (params.page - 1) * params.size\n        query = query.range(offset, offset + params.size - 1)\n        \n        # Sorting\n        if params.sort_by:\n            ascending = params.sort_order == \"asc\"\n            query = query.order(params.sort_by, desc=not ascending)\n        else:\n            query = query.order(\"created_at\", desc=True)\n        \n        # Execute query\n        result = query.execute()\n        \n        # Get total count\n        count_query = db.table(\"offers\").select(\"id\", count=\"exact\")\n        if supplier_check.data:\n            count_query = count_query.eq(\"suppliers.company_id\", current_user[\"company_id\"])\n        else:\n            count_query = count_query.eq(\"rfqs.company_id\", current_user[\"company_id\"])\n        if status_filter:\n            count_query = count_query.eq(\"status\", status_filter.value)\n        \n        count_result = count_query.execute()\n        total = count_result.count or 0\n        \n        has_next = (params.page * params.size) < total\n        has_previous = params.page > 1\n        \n        paginated_data = PaginatedResponse(\n            data=result.data or [],\n            total=total,\n            page=params.page,\n            size=params.size,\n            has_next=has_next,\n            has_previous=has_previous\n        )\n        \n        return APIResponse(\n            success=True,\n            data=paginated_data\n        )\n        \n    except Exception as e:\n        logger.error(f\"Offers list error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Teklif listesi alınırken hata oluştu\"\n        )\n\n@router.get(\"/by-rfq/{rfq_id}\", response_model=APIResponse[List[Offer]])\nasync def get_offers_by_rfq(\n    rfq_id: UUID,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"RFQ'ya ait teklifler\"\"\"\n    try:\n        # RFQ'nun sahibi mi kontrol et\n        rfq_check = db.table(\"rfqs\").select(\"company_id\").eq(\n            \"id\", str(rfq_id)\n        ).single().execute()\n        \n        if not rfq_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"RFQ bulunamadı\"\n            )\n        \n        if rfq_check.data[\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu RFQ'nun tekliflerini görme yetkiniz yok\"\n            )\n        \n        # Teklifleri getir\n        result = db.table(\"offers\").select(\n            \"*\", \n            \"suppliers(*, companies(*))\"\n        ).eq(\"rfq_id\", str(rfq_id)).order(\"price\", desc=False).execute()\n        \n        return APIResponse(\n            success=True,\n            data=result.data or []\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Offers by RFQ error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"RFQ teklifleri alınırken hata oluştu\"\n        )\n\n@router.get(\"/{offer_id}\", response_model=APIResponse[Offer])\nasync def get_offer_by_id(\n    offer_id: UUID,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Tek teklif detayı\"\"\"\n    try:\n        result = db.table(\"offers\").select(\n            \"*\", \n            \"rfqs(*)\", \n            \"suppliers(*, companies(*))\"\n        ).eq(\"id\", str(offer_id)).single().execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Teklif bulunamadı\"\n            )\n        \n        offer = result.data\n        \n        # Yetki kontrolü - RFQ sahibi veya teklifi veren tedarikçi görebilir\n        can_view = False\n        if offer[\"rfqs\"][\"company_id\"] == current_user[\"company_id\"]:  # RFQ sahibi\n            can_view = True\n        elif offer[\"suppliers\"][\"company_id\"] == current_user[\"company_id\"]:  # Teklif sahibi\n            can_view = True\n        \n        if not can_view:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu teklifi görme yetkiniz yok\"\n            )\n        \n        return APIResponse(\n            success=True,\n            data=offer\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Offer detail error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Teklif detayları alınırken hata oluştu\"\n        )\n\n@router.put(\"/{offer_id}\", response_model=APIResponse[Offer])\nasync def update_offer(\n    offer_id: UUID,\n    offer_update: OfferUpdate,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Teklif güncelle\"\"\"\n    try:\n        # Yetki kontrolü - sadece teklif sahibi güncelleyebilir\n        offer_check = db.table(\"offers\").select(\n            \"suppliers.company_id\", \"status\"\n        ).eq(\"id\", str(offer_id)).single().execute()\n        \n        if not offer_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Teklif bulunamadı\"\n            )\n        \n        if offer_check.data[\"suppliers\"][\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu teklifi güncelleme yetkiniz yok\"\n            )\n        \n        # Kabul edilmiş teklifler güncellenemez\n        if offer_check.data[\"status\"] in [\"accepted\", \"rejected\"]:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Kabul edilmiş veya reddedilmiş teklifler güncellenemez\"\n            )\n        \n        # Update data hazırla\n        update_data = {k: v for k, v in offer_update.dict().items() if v is not None}\n        update_data[\"updated_at\"] = \"now()\"\n        \n        # Güncelle\n        result = db.table(\"offers\").update(update_data).eq(\n            \"id\", str(offer_id)\n        ).execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Teklif güncellenemedi\"\n            )\n        \n        # Güncellenmiş teklifi getir\n        updated_offer = db.table(\"offers\").select(\n            \"*\", \n            \"rfqs(*)\", \n            \"suppliers(*, companies(*))\"\n        ).eq(\"id\", str(offer_id)).single().execute()\n        \n        return APIResponse(\n            success=True,\n            data=updated_offer.data,\n            message=\"Teklif başarıyla güncellendi\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Offer update error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Teklif güncellenirken hata oluştu\"\n        )\n\n@router.post(\"/{offer_id}/submit\", response_model=APIResponse[Offer])\nasync def submit_offer(\n    offer_id: UUID,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Teklifi gönder\"\"\"\n    try:\n        # Yetki kontrolü\n        offer_check = db.table(\"offers\").select(\n            \"suppliers.company_id\", \"status\"\n        ).eq(\"id\", str(offer_id)).single().execute()\n        \n        if not offer_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Teklif bulunamadı\"\n            )\n        \n        if offer_check.data[\"suppliers\"][\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu teklifi gönderme yetkiniz yok\"\n            )\n        \n        if offer_check.data[\"status\"] != \"draft\":\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Sadece taslak durumundaki teklifler gönderilebilir\"\n            )\n        \n        # Status'u submitted yap\n        result = db.table(\"offers\").update({\n            \"status\": \"submitted\",\n            \"updated_at\": \"now()\"\n        }).eq(\"id\", str(offer_id)).execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Teklif gönderilemedi\"\n            )\n        \n        # Güncellenmiş teklifi getir\n        submitted_offer = db.table(\"offers\").select(\n            \"*\", \n            \"rfqs(*)\", \n            \"suppliers(*, companies(*))\"\n        ).eq(\"id\", str(offer_id)).single().execute()\n        \n        return APIResponse(\n            success=True,\n            data=submitted_offer.data,\n            message=\"Teklif başarıyla gönderildi\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Offer submit error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Teklif gönderilirken hata oluştu\"\n        )\n
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from uuid import UUID
+
+from app.core.auth import get_current_user_profile
+from app.core.database import get_db
+from app.core.permissions import require_permission
+from app.models.supplier import Offer, OfferCreate, OfferUpdate, OfferStatus
+from app.models.common import APIResponse, PaginatedResponse, FilterParams
+from supabase import Client
+from loguru import logger
+
+router = APIRouter()
+
+
+@router.post("", response_model=APIResponse[Offer])
+async def create_offer(
+    offer_data: OfferCreate,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("quote:create"))
+):
+    """Teklif oluştur"""
+    try:
+        # RFQ check
+        rfq_check = (
+            db.table("rfqs").select("id", "status").eq("id", str(offer_data.rfq_id)).single().execute()
+        )
+        if not rfq_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ bulunamadı")
+        if rfq_check.data["status"] not in ["published", "in_review"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bu RFQ için teklif verilemez")
+
+        # Supplier check
+        supplier_check = (
+            db.table("suppliers").select("id", "company_id").eq("id", str(offer_data.supplier_id)).single().execute()
+        )
+        if not supplier_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tedarikçi bulunamadı")
+        if supplier_check.data["company_id"] != current_user["company_id"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu tedarikçi hesabı için teklif verme yetkiniz yok",
+            )
+
+        # Prevent duplicates
+        existing_offer = (
+            db.table("offers")
+            .select("id")
+            .eq("rfq_id", str(offer_data.rfq_id))
+            .eq("supplier_id", str(offer_data.supplier_id))
+            .execute()
+        )
+        if existing_offer.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Bu RFQ için zaten teklifiniz bulunmaktadır"
+            )
+
+        create_data = offer_data.dict()
+        create_data["status"] = OfferStatus.DRAFT.value
+        result = db.table("offers").insert(create_data).execute()
+        if not result.data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Teklif oluşturulamadı")
+
+        offer_detail = (
+            db.table("offers")
+            .select("*", "rfqs(*)", "suppliers(*, companies(*))")
+            .eq("id", result.data[0]["id"])
+            .single()
+            .execute()
+        )
+        return APIResponse(success=True, data=offer_detail.data, message="Teklif başarıyla oluşturuldu")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Offer creation error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Teklif oluşturulurken hata oluştu")
+
+
+@router.get("", response_model=APIResponse[PaginatedResponse[Offer]])
+async def get_offers(
+    params: FilterParams = Depends(),
+    status_filter: Optional[OfferStatus] = None,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("quote:read"))
+):
+    """Teklif listeleme (kullanıcının şirketine göre)"""
+    try:
+        query = db.table("offers").select("*", "rfqs(*)", "suppliers(*, companies(*))")
+
+        supplier_check = db.table("suppliers").select("id").eq("company_id", current_user["company_id"]).execute()
+        if supplier_check.data:
+            query = query.eq("suppliers.company_id", current_user["company_id"])
+        else:
+            query = query.eq("rfqs.company_id", current_user["company_id"])
+
+        if status_filter:
+            query = query.eq("status", status_filter.value)
+        if params.search:
+            query = query.ilike("notes", f"%{params.search}%")
+
+        offset = (params.page - 1) * params.size
+        query = query.range(offset, offset + params.size - 1)
+
+        if params.sort_by:
+            ascending = params.sort_order == "asc"
+            query = query.order(params.sort_by, desc=not ascending)
+        else:
+            query = query.order("created_at", desc=True)
+
+        result = query.execute()
+
+        count_query = db.table("offers").select("id", count="exact")
+        if supplier_check.data:
+            count_query = count_query.eq("suppliers.company_id", current_user["company_id"])
+        else:
+            count_query = count_query.eq("rfqs.company_id", current_user["company_id"])
+        if status_filter:
+            count_query = count_query.eq("status", status_filter.value)
+
+        count_result = count_query.execute()
+        total = count_result.count or 0
+        has_next = (params.page * params.size) < total
+        has_previous = params.page > 1
+
+        paginated_data = PaginatedResponse(
+            data=result.data or [],
+            total=total,
+            page=params.page,
+            size=params.size,
+            has_next=has_next,
+            has_previous=has_previous,
+        )
+
+        return APIResponse(success=True, data=paginated_data)
+    except Exception as e:
+        logger.error(f"Offers list error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Teklif listesi alınırken hata oluştu")
+
+
+@router.get("/by-rfq/{rfq_id}", response_model=APIResponse[List[Offer]])
+async def get_offers_by_rfq(
+    rfq_id: UUID,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("quote:read"))
+):
+    """RFQ'ya ait teklifler"""
+    try:
+        rfq_check = db.table("rfqs").select("company_id").eq("id", str(rfq_id)).single().execute()
+        if not rfq_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ bulunamadı")
+        if rfq_check.data["company_id"] != current_user["company_id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu RFQ'nun tekliflerini görme yetkiniz yok")
+
+        result = (
+            db.table("offers")
+            .select("*", "suppliers(*, companies(*))")
+            .eq("rfq_id", str(rfq_id))
+            .order("price", desc=False)
+            .execute()
+        )
+        return APIResponse(success=True, data=result.data or [])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Offers by RFQ error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="RFQ teklifleri alınırken hata oluştu")
+
+
+@router.get("/{offer_id}", response_model=APIResponse[Offer])
+async def get_offer_by_id(
+    offer_id: UUID,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("quote:read"))
+):
+    """Tek teklif detayı"""
+    try:
+        result = (
+            db.table("offers")
+            .select("*", "rfqs(*)", "suppliers(*, companies(*))")
+            .eq("id", str(offer_id))
+            .single()
+            .execute()
+        )
+        if not result.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teklif bulunamadı")
+
+        offer = result.data
+        can_view = False
+        if offer["rfqs"]["company_id"] == current_user["company_id"]:
+            can_view = True
+        elif offer["suppliers"]["company_id"] == current_user["company_id"]:
+            can_view = True
+        if not can_view:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu teklifi görme yetkiniz yok")
+
+        return APIResponse(success=True, data=offer)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Offer detail error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Teklif detayları alınırken hata oluştu")
+
+
+@router.put("/{offer_id}", response_model=APIResponse[Offer])
+async def update_offer(
+    offer_id: UUID,
+    offer_update: OfferUpdate,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("quote:update"))
+):
+    """Teklif güncelle"""
+    try:
+        offer_check = (
+            db.table("offers").select("supplier_id", "status", "suppliers(company_id)").eq("id", str(offer_id)).single().execute()
+        )
+        if not offer_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teklif bulunamadı")
+
+        if offer_check.data["suppliers"]["company_id"] != current_user["company_id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu teklifi güncelleme yetkiniz yok")
+
+        update_data = {k: v for k, v in offer_update.dict().items() if v is not None}
+        update_data["updated_at"] = "now()"
+
+        result = db.table("offers").update(update_data).eq("id", str(offer_id)).execute()
+        if not result.data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Teklif güncellenemedi")
+
+        updated_offer = (
+            db.table("offers").select("*", "rfqs(*)", "suppliers(*, companies(*))").eq("id", str(offer_id)).single().execute()
+        )
+        return APIResponse(success=True, data=updated_offer.data, message="Teklif başarıyla güncellendi")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Offer update error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Teklif güncellenirken hata oluştu")

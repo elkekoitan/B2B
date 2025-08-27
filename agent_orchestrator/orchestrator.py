@@ -28,6 +28,9 @@ class AgentOrchestrator:
             "aggregation_report": AggregationReportAgent()
         }
         self.running = False
+        self._hb_task = None
+        self._hb_key = "agentik:heartbeat"
+        self._version = "1.0.0"
         
         # Workflow definition
         self.workflow = {
@@ -52,6 +55,8 @@ class AgentOrchestrator:
         for agent_name, agent in self.agents.items():
             worker = asyncio.create_task(self._run_agent_worker(agent_name, agent))
             agent_workers.append(worker)
+        # Start heartbeat
+        self._hb_task = asyncio.create_task(self._heartbeat_loop())
         
         try:
             # Wait for all tasks to complete (they run indefinitely)
@@ -64,7 +69,9 @@ class AgentOrchestrator:
             job_processor.cancel()
             for worker in agent_workers:
                 worker.cancel()
-    
+            if self._hb_task:
+                self._hb_task.cancel()
+
     async def _process_main_jobs(self):
         """Process main job queue and route to first agent"""
         logger.info("Started main job processor")
@@ -218,3 +225,32 @@ class AgentOrchestrator:
             }
         
         return health
+
+    async def _heartbeat_loop(self):
+        """Publish a lightweight heartbeat to Redis for observability."""
+        try:
+            while self.running:
+                try:
+                    snapshot = {
+                        "ts": datetime.utcnow().isoformat(),
+                        "running": self.running,
+                        "version": self._version,
+                        "agents": list(self.agents.keys()),
+                        "queues": {
+                            "main": self.redis_client.llen("agentik:jobs"),
+                        },
+                    }
+                    for agent_name in self.agents.keys():
+                        qn = f"agentik:agent:{agent_name}"
+                        try:
+                            snapshot["queues"][agent_name] = self.redis_client.llen(qn)
+                        except Exception:
+                            snapshot["queues"][agent_name] = None
+                    # store as JSON string
+                    self.redis_client.set(self._hb_key, json.dumps(snapshot))
+                except Exception as e:
+                    logger.warning(f"Heartbeat publish failed: {e}")
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            logger.info("Heartbeat loop cancelled")
+            raise

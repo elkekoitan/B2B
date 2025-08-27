@@ -4,6 +4,7 @@ import { useApiClient } from '../services/api'
 import { Button } from '../components/ui/Button'
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../components/ui/Card'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   Calendar,
@@ -96,21 +97,26 @@ export function RFQDetailPage() {
 
     setStartingWorkflow(true)
     try {
-      const response = await apiClient.startWorkflow({
-        job_type: 'rfq_process',
+      const response = await apiClient.orchestrateJob({
+        job_type: 'supplier_discovery',
         rfq_id: data.rfq.id,
         payload: { rfq: data.rfq }
-      })
+      }) as any
 
-      if (response.success && response.data?.job_id) {
-        const jobId = response.data.job_id
+      if (response?.success && response?.data?.job_id) {
+        const jobId = response.data.job_id as string
         // Start polling job status
         pollJobStatus(jobId)
+        toast.success('Workflow başlatıldı')
       } else {
-        setError('Workflow başlatma hatası')
+        const msg = response?.message || 'Workflow başlatma hatası'
+        setError(msg)
+        toast.error(msg)
       }
     } catch (err: any) {
-      setError(err.message || 'Workflow başlatma hatası')
+      const msg = err.message || 'Workflow başlatma hatası'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setStartingWorkflow(false)
     }
@@ -119,14 +125,14 @@ export function RFQDetailPage() {
   const pollJobStatus = (jobId: string) => {
     const poll = async () => {
       try {
-        const response = await apiClient.getJobStatus(jobId)
-        if (response.success) {
-          setJobStatus(response.data)
+        const response: any = await apiClient.getOrchestrateStatus(jobId)
+        if (response?.success) {
+          setJobStatus(response.data?.job)
           
-          if (response.data.status === 'completed') {
+          if (response.data?.job?.status === 'completed') {
             // Reload RFQ data to show updated offers
             loadRFQDetails(true)
-          } else if (response.data.status !== 'failed') {
+          } else if (response.data?.job?.status !== 'failed') {
             // Continue polling
             setTimeout(poll, 5000)
           }

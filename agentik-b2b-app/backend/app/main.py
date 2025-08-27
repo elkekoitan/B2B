@@ -1,1 +1,195 @@
-from fastapi import FastAPI, HTTPException, Depends\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom fastapi.security import HTTPBearer\nfrom fastapi.exceptions import RequestValidationError\nfrom starlette.exceptions import HTTPException as StarletteHTTPException\nfrom contextlib import asynccontextmanager\nimport os\nfrom dotenv import load_dotenv\nfrom loguru import logger\n\n# Load environment variables\nload_dotenv()\n\n# Import routers\nfrom app.api.routes import rfq, supplier, offer, email, notification, auth\nfrom app.api.routes import orchestrator\nfrom app.core.database import init_db\nfrom app.core.redis_client import init_redis\nfrom app.core.config import settings\nfrom app.core.middleware import LoggingMiddleware, SecurityHeadersMiddleware, RateLimitMiddleware\nfrom app.core.exceptions import (\n    http_exception_handler,\n    validation_exception_handler,\n    general_exception_handler,\n    starlette_exception_handler,\n    BusinessLogicError,\n    DatabaseError,\n    AuthenticationError,\n    AuthorizationError,\n    business_logic_exception_handler,\n    database_exception_handler,\n    authentication_exception_handler,\n    authorization_exception_handler\n)\n\n# Lifespan management\n@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # Startup\n    logger.info(\"Starting Agentik B2B API...\")\n    \n    # Initialize connections\n    try:\n        await init_db()\n        await init_redis()\n        logger.info(\"All connections initialized successfully\")\n    except Exception as e:\n        logger.error(f\"Failed to initialize connections: {e}\")\n        raise\n    \n    yield\n    \n    # Shutdown\n    logger.info(\"Shutting down Agentik B2B API...\")\n\n# Create FastAPI app\napp = FastAPI(\n    title=\"Agentik B2B Tedarik API\",\n    description=\"AI-powered B2B procurement platform API\",\n    version=\"1.0.0\",\n    lifespan=lifespan,\n    docs_url=\"/docs\",\n    redoc_url=\"/redoc\",\n    openapi_url=\"/openapi.json\"\n)\n\n# Add middleware in correct order (last added = first executed)\n# CORS middleware (should be first in execution order)\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=settings.ALLOWED_ORIGINS,\n    allow_credentials=True,\n    allow_methods=[\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\", \"OPTIONS\"],\n    allow_headers=[\"*\"],\n)\n\n# Security headers middleware\napp.add_middleware(SecurityHeadersMiddleware)\n\n# Rate limiting middleware (for production, consider using Redis-based solution)\napp.add_middleware(RateLimitMiddleware, calls=100, period=60)\n\n# Logging middleware (should be last in middleware chain)\napp.add_middleware(LoggingMiddleware)\n\n# Exception handlers\napp.add_exception_handler(HTTPException, http_exception_handler)\napp.add_exception_handler(RequestValidationError, validation_exception_handler)\napp.add_exception_handler(StarletteHTTPException, starlette_exception_handler)\napp.add_exception_handler(BusinessLogicError, business_logic_exception_handler)\napp.add_exception_handler(DatabaseError, database_exception_handler)\napp.add_exception_handler(AuthenticationError, authentication_exception_handler)\napp.add_exception_handler(AuthorizationError, authorization_exception_handler)\napp.add_exception_handler(Exception, general_exception_handler)\n\n# Security\nsecurity = HTTPBearer()\n\n# Include routers\napp.include_router(auth.router, prefix=\"/api/v1/auth\", tags=[\"Authentication\"])\napp.include_router(rfq.router, prefix=\"/api/v1/rfqs\", tags=[\"RFQs\"])\napp.include_router(supplier.router, prefix=\"/api/v1/suppliers\", tags=[\"Suppliers\"])\napp.include_router(offer.router, prefix=\"/api/v1/offers\", tags=[\"Offers\"])\napp.include_router(email.router, prefix=\"/api/v1/emails\", tags=[\"Email\"])\napp.include_router(notification.router, prefix=\"/api/v1/notifications\", tags=[\"Notifications\"])\napp.include_router(orchestrator.router, prefix=\"/api/v1/orchestrator\", tags=[\"Orchestrator\"])\n\n# Health check endpoints\n@app.get(\"/health\", tags=[\"Health\"])\nasync def health_check():\n    \"\"\"Basic health check\"\"\"\n    return {\n        \"status\": \"healthy\", \n        \"service\": \"Agentik B2B API\",\n        \"version\": \"1.0.0\"\n    }\n\n@app.get(\"/health/detailed\", tags=[\"Health\"])\nasync def detailed_health_check():\n    \"\"\"Detailed health check with database and Redis status\"\"\"\n    from app.core.database import test_connection\n    from app.core.redis_client import redis_client\n    \n    health_status = {\n        \"status\": \"healthy\",\n        \"service\": \"Agentik B2B API\",\n        \"version\": \"1.0.0\",\n        \"checks\": {\n            \"database\": \"unknown\",\n            \"redis\": \"unknown\"\n        }\n    }\n    \n    # Test database connection\n    try:\n        db_healthy = await test_connection()\n        health_status[\"checks\"][\"database\"] = \"healthy\" if db_healthy else \"unhealthy\"\n    except Exception as e:\n        logger.error(f\"Database health check failed: {e}\")\n        health_status[\"checks\"][\"database\"] = \"unhealthy\"\n        health_status[\"status\"] = \"unhealthy\"\n    \n    # Test Redis connection\n    try:\n        if redis_client:\n            await redis_client.ping()\n            health_status[\"checks\"][\"redis\"] = \"healthy\"\n        else:\n            health_status[\"checks\"][\"redis\"] = \"unhealthy\"\n            health_status[\"status\"] = \"unhealthy\"\n    except Exception as e:\n        logger.error(f\"Redis health check failed: {e}\")\n        health_status[\"checks\"][\"redis\"] = \"unhealthy\"\n        health_status[\"status\"] = \"unhealthy\"\n    \n    return health_status\n\n# Root endpoint\n@app.get(\"/\", tags=[\"Root\"])\nasync def root():\n    \"\"\"API root endpoint\"\"\"\n    return {\n        \"message\": \"Agentik B2B Tedarik API'sine hoş geldiniz!\",\n        \"version\": \"1.0.0\",\n        \"docs\": \"/docs\",\n        \"health\": \"/health\",\n        \"endpoints\": {\n            \"auth\": \"/api/v1/auth\",\n            \"rfqs\": \"/api/v1/rfqs\",\n            \"suppliers\": \"/api/v1/suppliers\",\n            \"offers\": \"/api/v1/offers\",\n            \"emails\": \"/api/v1/emails\",\n            \"notifications\": \"/api/v1/notifications\",\n            \"orchestrator\": \"/api/v1/orchestrator\"\n        }\n    }\n\n# API info endpoint\n@app.get(\"/api/v1/info\", tags=[\"Info\"])\nasync def api_info():\n    \"\"\"API information endpoint\"\"\"\n    return {\n        \"name\": \"Agentik B2B API\",\n        \"version\": \"1.0.0\",\n        \"description\": \"AI-powered B2B procurement platform API\",\n        \"features\": [\n            \"RFQ Management\",\n            \"Supplier Management\",\n            \"Offer Management\",\n            \"Email Integration\",\n            \"Real-time Notifications\",\n            \"AI Agent Orchestration\"\n        ],\n        \"authentication\": \"Bearer Token (Supabase JWT)\",\n        \"rate_limit\": \"100 requests per minute\"\n    }\n\nif __name__ == \"__main__\":\n    import uvicorn\n    uvicorn.run(\n        \"main:app\",\n        host=\"0.0.0.0\",\n        port=8000,\n        reload=True,\n        log_level=\"info\"\n    )\n
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+from loguru import logger
+
+# Load environment variables
+load_dotenv()
+
+# Import routers
+from app.api.routes import rfq, supplier, offer, email, notification, auth
+from app.api.routes import orchestrator, rfq_templates
+from app.api.routes import catalog, verification, auth_2fa
+from app.api.routes import utils
+from app.core.database import init_db
+from app.core.redis_client import init_redis
+from app.core.config import settings
+from app.core.middleware import (
+    LoggingMiddleware,
+    SecurityHeadersMiddleware,
+    RateLimitMiddleware,
+)
+from app.core.exceptions import (
+    http_exception_handler,
+    validation_exception_handler,
+    general_exception_handler,
+    starlette_exception_handler,
+    BusinessLogicError,
+    DatabaseError,
+    AuthenticationError,
+    AuthorizationError,
+    business_logic_exception_handler,
+    database_exception_handler,
+    authentication_exception_handler,
+    authorization_exception_handler,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting Agentik B2B API...")
+    try:
+        await init_db()
+        await init_redis()
+        logger.info("All connections initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize connections: {e}")
+        raise
+    yield
+    logger.info("Shutting down Agentik B2B API...")
+
+
+app = FastAPI(
+    title="Agentik B2B Tedarik API",
+    description="AI-powered B2B procurement platform API",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
+
+# Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"],
+)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware, calls=100, period=60)
+app.add_middleware(LoggingMiddleware)
+
+# Exception handlers
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, starlette_exception_handler)
+app.add_exception_handler(BusinessLogicError, business_logic_exception_handler)
+app.add_exception_handler(DatabaseError, database_exception_handler)
+app.add_exception_handler(AuthenticationError, authentication_exception_handler)
+app.add_exception_handler(AuthorizationError, authorization_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
+# Security
+security = HTTPBearer()
+
+# Routers
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(rfq.router, prefix="/api/v1/rfqs", tags=["RFQs"])
+app.include_router(rfq_templates.router, prefix="/api/v1/rfqs/templates", tags=["RFQ Templates"])
+app.include_router(supplier.router, prefix="/api/v1/suppliers", tags=["Suppliers"])
+app.include_router(offer.router, prefix="/api/v1/offers", tags=["Offers"])
+app.include_router(email.router, prefix="/api/v1/emails", tags=["Email"])
+app.include_router(notification.router, prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(orchestrator.router, prefix="/api/v1/orchestrator", tags=["Orchestrator"])
+app.include_router(catalog.router, prefix="/api/v1/catalog", tags=["Catalog"])
+app.include_router(verification.router, prefix="/api/v1/verification", tags=["Verification"])
+app.include_router(auth_2fa.router, prefix="/api/v1/auth/2fa", tags=["Authentication"])
+app.include_router(utils.router, prefix="/api/v1/utils", tags=["Utilities"])
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    return {"status": "healthy", "service": "Agentik B2B API", "version": "1.0.0"}
+
+
+@app.get("/health/detailed", tags=["Health"])
+async def detailed_health_check():
+    from app.core.database import test_connection
+    from app.core.redis_client import redis_client
+
+    health_status = {
+        "status": "healthy",
+        "service": "Agentik B2B API",
+        "version": "1.0.0",
+        "checks": {"database": "unknown", "redis": "unknown"},
+    }
+    try:
+        db_healthy = await test_connection()
+        health_status["checks"]["database"] = "healthy" if db_healthy else "unhealthy"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        health_status["checks"]["database"] = "unhealthy"
+        health_status["status"] = "unhealthy"
+    try:
+        if redis_client:
+            await redis_client.ping()
+            health_status["checks"]["redis"] = "healthy"
+        else:
+            health_status["checks"]["redis"] = "unhealthy"
+            health_status["status"] = "unhealthy"
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+        health_status["checks"]["redis"] = "unhealthy"
+        health_status["status"] = "unhealthy"
+    return health_status
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    return {
+        "message": "Agentik B2B Tedarik API'sine hoş geldiniz!",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "auth": "/api/v1/auth",
+            "rfqs": "/api/v1/rfqs",
+            "rfq_templates": "/api/v1/rfqs/templates",
+            "suppliers": "/api/v1/suppliers",
+            "offers": "/api/v1/offers",
+            "emails": "/api/v1/emails",
+            "notifications": "/api/v1/notifications",
+            "orchestrator": "/api/v1/orchestrator",
+            "catalog": "/api/v1/catalog",
+            "verification": "/api/v1/verification",
+            "auth_2fa": "/api/v1/auth/2fa",
+            "utils": "/api/v1/utils",
+        },
+    }
+
+
+@app.get("/api/v1/info", tags=["Info"])
+async def api_info():
+    return {
+        "name": "Agentik B2B API",
+        "version": "1.0.0",
+        "description": "AI-powered B2B procurement platform API",
+        "features": [
+            "RFQ Management",
+            "Supplier Management",
+            "Offer Management",
+            "Email Integration",
+            "Real-time Notifications",
+            "AI Agent Orchestration",
+        ],
+        "authentication": "Bearer Token (Supabase JWT)",
+        "rate_limit": "100 requests per minute",
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )

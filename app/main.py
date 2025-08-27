@@ -328,6 +328,146 @@ async def api_info():
         logger.warning(f"api_info failed: {e}")
         return BaseResponse(success=True, data={"name": "Agentik B2B API"})
 
+# Role Management Endpoints
+@app.get("/roles", response_model=BaseResponse, dependencies=[Depends(require_admin)])
+async def list_roles(current_user: dict = Depends(get_current_user)):
+    """List all available roles"""
+    try:
+        response = supabase.table("user_roles").select("*").execute()
+        roles = [UserRoleModel(**role) for role in response.data] if response.data else []
+        return BaseResponse(success=True, data={"roles": roles})
+    except Exception as e:
+        logger.error(f"Failed to fetch roles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/roles", response_model=BaseResponse, dependencies=[Depends(require_admin)])
+async def create_role(role: UserRoleModel, current_user: dict = Depends(get_current_user)):
+    """Create a new role"""
+    try:
+        role_data = role.dict(exclude_unset=True)
+        role_data["created_at"] = datetime.utcnow().isoformat()
+        role_data["updated_at"] = datetime.utcnow().isoformat()
+        
+        response = supabase.table("user_roles").insert(role_data).execute()
+        created_role = UserRoleModel(**response.data[0]) if response.data else None
+        
+        return BaseResponse(success=True, message="Role created successfully", data={"role": created_role})
+    except Exception as e:
+        logger.error(f"Failed to create role: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/roles/{role_id}", response_model=BaseResponse, dependencies=[Depends(require_admin)])
+async def update_role(role_id: str, role: UserRoleModel, current_user: dict = Depends(get_current_user)):
+    """Update an existing role"""
+    try:
+        role_data = role.dict(exclude_unset=True)
+        role_data["updated_at"] = datetime.utcnow().isoformat()
+        
+        response = supabase.table("user_roles").update(role_data).eq("id", role_id).execute()
+        updated_role = UserRoleModel(**response.data[0]) if response.data else None
+        
+        return BaseResponse(success=True, message="Role updated successfully", data={"role": updated_role})
+    except Exception as e:
+        logger.error(f"Failed to update role: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/roles/{role_id}", response_model=BaseResponse, dependencies=[Depends(require_admin)])
+async def delete_role(role_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a role"""
+    try:
+        supabase.table("user_roles").delete().eq("id", role_id).execute()
+        return BaseResponse(success=True, message="Role deleted successfully")
+    except Exception as e:
+        logger.error(f"Failed to delete role: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/users/{user_id}/roles", response_model=BaseResponse, dependencies=[Depends(require_admin)])
+async def assign_role_to_user(user_id: str, role_id: str, current_user: dict = Depends(get_current_user)):
+    """Assign a role to a user"""
+    try:
+        # Check if user exists
+        user_response = supabase.table("users").select("*").eq("id", user_id).maybe_single().execute()
+        if not user_response.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Check if role exists
+        role_response = supabase.table("user_roles").select("*").eq("id", role_id).maybe_single().execute()
+        if not role_response.data:
+            raise HTTPException(status_code=404, detail="Role not found")
+        
+        # Create role assignment
+        assignment_data = {
+            "user_id": user_id,
+            "role_id": role_id,
+            "assigned_by": current_user["user_id"],
+            "assigned_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+        
+        response = supabase.table("role_assignments").insert(assignment_data).execute()
+        assignment = RoleAssignment(**response.data[0]) if response.data else None
+        
+        # Update user's role in users table
+        supabase.table("users").update({"role": role_response.data["name"]}).eq("id", user_id).execute()
+        
+        return BaseResponse(success=True, message="Role assigned successfully", data={"assignment": assignment})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to assign role: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/users/{user_id}/roles/{role_id}", response_model=BaseResponse, dependencies=[Depends(require_admin)])
+async def remove_role_from_user(user_id: str, role_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a role from a user"""
+    try:
+        # Check if user exists
+        user_response = supabase.table("users").select("*").eq("id", user_id).maybe_single().execute()
+        if not user_response.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Deactivate role assignment
+        supabase.table("role_assignments").update({
+            "is_active": False,
+            "updated_at": datetime.utcnow().isoformat()
+        }).eq("user_id", user_id).eq("role_id", role_id).execute()
+        
+        # Reset user's role to default
+        supabase.table("users").update({"role": "user"}).eq("id", user_id).execute()
+        
+        return BaseResponse(success=True, message="Role removed successfully")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to remove role: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/users/{user_id}/roles", response_model=BaseResponse)
+async def get_user_roles(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Get roles assigned to a user"""
+    try:
+        # Check if requesting user has permission to view this user's roles
+        if current_user["user_id"] != user_id and current_user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Get active role assignments for the user
+        response = supabase.table("role_assignments").select("*").eq("user_id", user_id).eq("is_active", True).execute()
+        assignments = [RoleAssignment(**assignment) for assignment in response.data] if response.data else []
+        
+        # Get role details
+        roles = []
+        for assignment in assignments:
+            role_response = supabase.table("user_roles").select("*").eq("id", assignment.role_id).maybe_single().execute()
+            if role_response.data:
+                roles.append(UserRoleModel(**role_response.data))
+        
+        return BaseResponse(success=True, data={"roles": roles, "assignments": assignments})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch user roles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # RFQ Endpoints
 @app.post("/rfqs", response_model=BaseResponse, dependencies=[Depends(require_permission("rfq", "create"))])
 async def create_rfq(

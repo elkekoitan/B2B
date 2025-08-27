@@ -5,10 +5,16 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { RFQFormPage } from './pages/RFQFormPage'
 import { RFQDetailPage } from './pages/RFQDetailPage'
+import { RFQTemplatePage } from './pages/RFQTemplatePage'
+import { VerificationPage } from './pages/VerificationPage'
+import { TwoFactorPage } from './pages/TwoFactorPage'
+import { CatalogPage } from './pages/CatalogPage'
+import { JobsPage } from './pages/JobsPage'
 import { AdminPage } from './pages/AdminPage'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { Navbar } from './components/Navbar'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { Toaster } from 'sonner'
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -86,6 +92,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/rfq/templates"
+        element={
+          <ProtectedRoute>
+            <RFQTemplatePage />
+          </ProtectedRoute>
+        }
+      />
       
       <Route
         path="/rfq/:id"
@@ -103,6 +117,38 @@ function AppRoutes() {
           <AdminRoute>
             <AdminPage />
           </AdminRoute>
+        }
+      />
+      <Route
+        path="/verification"
+        element={
+          <ProtectedRoute>
+            <VerificationPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/2fa"
+        element={
+          <ProtectedRoute>
+            <TwoFactorPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/catalog"
+        element={
+          <ProtectedRoute>
+            <CatalogPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs"
+        element={
+          <ProtectedRoute>
+            <JobsPage />
+          </ProtectedRoute>
         }
       />
       
@@ -143,6 +189,7 @@ export default function App() {
         <AuthProvider>
           <div className="min-h-screen bg-gray-50">
             <AppRoutes />
+            <Toaster richColors position="top-right" />
           </div>
         </AuthProvider>
       </Router>

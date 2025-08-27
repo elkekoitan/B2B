@@ -547,6 +547,26 @@ describe('RFQForm', () => {
 ```
 
 ## 🚀 Deployment Strategy
+### Repository Structure & Commands
+```
+agentik-b2b-app/backend/app   # FastAPI backend
+frontend/                     # React + Vite web
+agent_orchestrator/           # Agents service
+```
+Common dev commands:
+```
+docker compose build && docker compose up -d
+docker compose logs -f backend
+```
+
+### RBAC Enforcement in Endpoints
+```python
+from app.core.permissions import require_permission
+
+@router.post("/", dependencies=[Depends(require_permission("rfq:create"))])
+async def create_rfq(...):
+    ...
+```
 
 ### CI/CD Pipeline
 ```yaml

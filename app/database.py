@@ -225,40 +225,29 @@ class MockSupabaseClient:
         }
 
 class SupabaseClient:
-    """Supabase client wrapper supporting mock (dev) and real (prod)."""
+    """Supabase client wrapper (real only)."""
 
     def __init__(self):
-        env = os.getenv("ENVIRONMENT", "development").lower()
-        use_mock = os.getenv("USE_MOCK_SUPABASE", "").lower() in {"1", "true", "yes"}
         supabase_url = os.getenv("SUPABASE_URL")
-        anon_key = os.getenv("SUPABASE_KEY")
+        anon_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
         service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-        if env == "production" and not use_mock and supabase_url and anon_key and service_key and "_create_supabase_client" in globals():
-            try:
-                client = _create_supabase_client(supabase_url, anon_key)
-                admin_client = _create_supabase_client(supabase_url, service_key)
-                self.client = client
-                self.admin_client = admin_client
-                self.mode = "real"
-                logger.info("Using real Supabase client (production mode)")
-            except Exception as e:
-                logger.error(f"Failed to initialize real Supabase client, falling back to mock: {e}")
-                self.client = MockSupabaseClient()
-                self.admin_client = MockSupabaseClient()
-                self.mode = "mock"
-        else:
-            self.client = MockSupabaseClient()
-            self.admin_client = MockSupabaseClient()
-            self.mode = "mock"
-            logger.info("Using mock Supabase client for development")
+        if not (supabase_url and anon_key and service_key and "_create_supabase_client" in globals()):
+            raise RuntimeError("Supabase config missing. Set SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.")
+        try:
+            client = _create_supabase_client(supabase_url, anon_key)
+            admin_client = _create_supabase_client(supabase_url, service_key)
+            self.client = client
+            self.admin_client = admin_client
+            self.mode = "real"
+            logger.info("Using real Supabase client")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase client: {e}")
+            raise
 
     def get_client(self, admin: bool = False):
         return self.admin_client if admin else self.client
 
     async def health_check(self) -> dict:
-        if self.mode == "mock":
-            return await self.client.health_check()
         # Best-effort health check for real client
         return {
             "status": "healthy",

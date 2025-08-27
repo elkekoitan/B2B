@@ -4,7 +4,9 @@
 
 The B2B Agentik Platform provides a comprehensive REST API built with FastAPI, enabling seamless integration for procurement, supplier management, and RFQ processing. This documentation covers all available endpoints, authentication, request/response formats, and integration examples.
 
-**Base URL:** `http://localhost:18000` (Production) | `http://localhost:8000` (Development)
+**Base URL:**
+- Reverse proxy (local): `http://localhost:8080` (frontend at `/`, API under `/api/*`)
+- Backend direct (dev): `http://localhost:8000`
 
 **API Version:** v1
 
@@ -20,6 +22,14 @@ The B2B Agentik Platform provides a comprehensive REST API built with FastAPI, e
 4. [Supplier Management](#supplier-management)
 5. [User Management](#user-management)
 6. [AI Agent Services](#ai-agent-services)
+   - [Orchestrate Jobs](#orchestrate-jobs)
+
+### Jobs Analytics
+
+
+
+Response:
+
 7. [Error Handling](#error-handling)
 8. [Rate Limiting](#rate-limiting)
 9. [Webhooks](#webhooks)
@@ -72,6 +82,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 - **supplier**: Can respond to RFQs, manage product catalog
 - **admin**: Full system access
 - **manager**: Company-level management access
+
+### RBAC & Authorization
+- İsteğe bağlı RBAC: `PERMISSIONS_ENFORCED=true` ise endpoint bazlı izinler zorunludur.
+- İzin yoksa `403 Forbidden` döner.
+- Örnekler: `rfq:create` (`POST /rfqs`), `rfq:update` (`PUT /rfqs/{id}`), `rfq:delete` (`DELETE /rfqs/{id}`)
 
 ---
 
@@ -134,21 +149,10 @@ Content-Type: application/json
   "unit": "kg",
   "budget_min": 15000,
   "budget_max": 25000,
-  "currency": "USD",
+  "deadline": "2025-12-31T00:00:00Z",
   "delivery_location": "Dubai, UAE",
-  "delivery_deadline": "2024-02-15T00:00:00Z",
-  "technical_specifications": {
-    "type": "PCE Superplasticizer",
-    "water_reduction": "30%",
-    "slump_retention": "90 minutes",
-    "chloride_content": "< 0.1%"
-  },
-  "documents": [
-    {
-      "name": "Technical Specification.pdf",
-      "url": "https://storage.com/file123"
-    }
-  ]
+  "requirements": "SDS ve CoA gereklidir",
+  "priority": "medium"
 }
 ```
 
@@ -194,15 +198,17 @@ Content-Type: application/json
 ### List RFQs
 
 ```http
-GET /rfqs?status=active&category=chemicals&page=1&limit=20
+GET /rfqs?status=draft&category=chemicals&page=1&per_page=20&sort_by=created_at&sort_dir=desc
 Authorization: Bearer {token}
 ```
 
 **Query Parameters:**
-- `status`: `draft`, `published`, `closed`, `awarded`
+- `status`: `draft`, `published`, `in_progress`, `completed`, `cancelled`
 - `category`: Product category filter
 - `page`: Page number (default: 1)
-- `limit`: Items per page (default: 20, max: 100)
+- `per_page`: Items per page (default: 20, max: 100)
+- `sort_by`: `created_at` | `updated_at` | `deadline_date` (default: `created_at`)
+- `sort_dir`: `asc` | `desc` (default: `desc`)
 - `search`: Search term
 
 ### Delete RFQ
@@ -337,6 +343,206 @@ Content-Type: application/json
 ---
 
 ## AI Agent Services
+
+### Orchestrate Jobs
+
+Trigger and monitor multi-agent workflows via Redis-backed queues.
+
+Endpoints (root-level):
+- `POST /orchestrate` — Start a job
+  - Body: `{ "job_type": "rfq_process|supplier_discovery|email_campaign", "rfq_id": "<uuid>", "payload": { ... } }`
+  - Response: `{ success: true, data: { job_id } }`
+- `GET /orchestrate/status/{job_id}` — Get status
+  - Response: `{ success: true, data: { job: { job_id, status, job_type, updated_at, result, error } } }`
+- `GET /orchestrate/recent?limit=10&job_type=rfq_process` — Recent (Redis)
+- `GET /orchestrate/history?limit=20&job_type=rfq_process` — History (DB, best-effort)
+- `DELETE /orchestrate/{job_id}` — Cancel (only queued reliably)
+
+Status values: `queued | in_progress | completed | failed`
+
+Notes:
+- Backend ↔ Agents keyspace: `agentik:jobs`, `agentik:status:{job_id}`.
+- See `docs/QUEUE_CONTRACT.md` for payload and status schema.
+
+---
+
+## Appendix: Supplier & Offers (Updated)
+
+### Suppliers
+
+- `GET /suppliers?page=1&per_page=50&category=chemicals&verified_only=false`
+  - Response: `{ success, data: Supplier[], total }`
+- `POST /suppliers` (admin): create supplier with `name, email, company, categories, description`
+
+### Offers
+
+- `GET /offers?rfq_id={rfq_id}`: list offers for a specific RFQ or all user RFQs
+- `GET /offers/by-rfq/{rfq_id}`: includes basic analysis (`price_range`, `delivery_time_range`)
+
+Offer item fields: `id, rfq_id, supplier_id, unit_price, total_price, delivery_time, status, submitted_at`.
+
+### Orchestrate Job (Local simplified API)
+
+```http
+POST /orchestrate
+Content-Type: application/json
+
+{
+  "job_type": "supplier_discovery",
+  "rfq_id": "rfq-uuid",
+  "payload": { "note": "optional" }
+}
+```
+
+Response
+```json
+{
+  "success": true,
+  "message": "Job enqueued",
+  "data": { "job_id": "job-uuid" }
+}
+```
+
+### Get Job Status
+
+```http
+GET /orchestrate/status/{job_id}
+
+Frontend usage (example):
+```ts
+// Start
+const r = await apiClient.orchestrateJob({ job_type: 'supplier_discovery', rfq_id: 'rfq-uuid' })
+// Status
+const s = await apiClient.getOrchestrateStatus(r.data.job_id)
+```
+
+### List Recent Jobs (Local)
+
+```http
+GET /orchestrate/recent?limit=10
+```
+
+### List Job History (Supabase)
+
+```http
+GET /orchestrate/history?limit=20
+```
+
+Response
+```json
+{
+  "success": true,
+  "data": {
+    "jobs": [
+      { "id": "...", "job_type": "...", "status": "...", "rfq_id": "...", "updated_at": "..." }
+    ]
+  }
+}
+```
+Response
+```json
+{
+  "success": true,
+  "data": {
+    "jobs": [ { "id": "...", "status": "...", "updated_at": "..." }, {"id":"..."} ]
+  }
+}
+```
+```
+
+Response
+```json
+{
+  "success": true,
+  "data": {
+    "job": {
+      "id": "job-uuid",
+      "status": "queued|completed|failed",
+      "user_id": "...",
+      "updated_at": "...",
+      "result": { }
+    }
+  }
+}
+```
+
+---
+
+## Verification & 2FA
+
+### Request Company Verification
+```http
+POST /verification/request
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "documents": [
+    {"file_name":"trade_license.pdf","file_path":"/uploads/..","file_type":"verification","file_size":12345}
+  ],
+  "notes": "Please verify our company"
+}
+```
+
+### Approve Company Verification (Admin)
+```http
+POST /verification/approve
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "company_id": "uuid" }
+```
+
+### 2FA Setup/Enable/Disable
+```http
+POST /auth/2fa/setup
+POST /auth/2fa/enable { "code": "123456" }
+POST /auth/2fa/disable
+```
+
+### List Verification Requests (Admin)
+```http
+GET /verification/requests?page=1&size=20
+Authorization: Bearer {token}
+```
+
+### Reject Company Verification (Admin)
+```http
+POST /verification/reject
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "company_id": "uuid" }
+```
+
+---
+
+## Supplier Catalog
+
+```http
+GET /catalog/mine           # list own items
+GET /catalog/supplier/{id}  # list by supplier
+POST /catalog               # create item
+PUT /catalog/{item_id}      # update item
+DELETE /catalog/{item_id}   # delete item
+```
+
+---
+
+## Utilities
+
+### Currency
+```http
+GET /utils/currency/rates   # returns default rates to USD
+GET /utils/currency/convert?amount=100&from_currency=EUR&to_currency=TRY
+```
+
+### File Upload (local dev)
+```http
+POST /utils/upload  (multipart/form-data)
+Form field: f = <file>
+```
+Returns `{ file_name, file_path }` to be used in verification requests.
 
 ### Get AI Market Insights
 
@@ -658,3 +864,44 @@ Full OpenAPI/Swagger specification available at: `{BASE_URL}/openapi.json`
 
 *Last Updated: January 2024*
 *API Version: 1.0.0*
+### RFQ Templates
+
+```http
+GET /rfqs/templates
+Authorization: Bearer {token}
+```
+
+```http
+GET /rfqs/templates/{category}
+Authorization: Bearer {token}
+```
+
+Returns an industry-specific template with fields and a compliance checklist. Example categories: `chemicals`, `electronics`, `textiles`.
+### Create RFQ With Template
+
+```http
+POST /rfqs/template
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "title": "Chemical RFQ",
+  "description": "Need PCE Superplasticizer",
+  "category": "chemicals",
+  "quantity": 5000,
+  "unit": "kg",
+  "extra_fields": {
+    "cas_number": "123-45-6",
+    "purity": 98.5,
+    "msds_required": true
+  }
+}
+```
+
+Requires all template-required fields for the given category. Returns created RFQ.
+
+## Jobs Analytics
+
+GET /analytics/jobs?days=7
+
+Response:

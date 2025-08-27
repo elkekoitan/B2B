@@ -23,6 +23,13 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    BUYER = "buyer"
+    SUPPLIER = "supplier"
+    MANAGER = "manager"
+    USER = "user"
+
 # Base Models
 class BaseResponse(BaseModel):
     success: bool
@@ -37,8 +44,26 @@ class User(BaseModel):
     full_name: Optional[str] = None
     company_name: Optional[str] = None
     phone: Optional[str] = None
+    role: Optional[str] = "user"
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+class UserRoleModel(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class RoleAssignment(BaseModel):
+    id: str
+    user_id: str
+    role_id: str
+    assigned_by: Optional[str] = None
+    assigned_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    is_active: Optional[bool] = True
 
 # RFQ Models
 class RFQCreate(BaseModel):

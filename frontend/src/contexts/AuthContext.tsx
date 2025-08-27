@@ -10,6 +10,7 @@ const MOCK_ADMIN_USER: AppUser = {
   full_name: "Turhan Hamza",
   company_name: "Agentik Admin",
   phone: "",
+  role: "admin",
   is_admin: true,
   created_at: "2025-08-24T16:17:55.333458",
   updated_at: "2025-08-24T16:17:55.333465"
@@ -36,6 +37,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, metadata?: any) => Promise<void>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<AppUser>) => Promise<void>
+  hasPermission: (resource: string, action: string) => boolean
+  hasRole: (roles: string | string[]) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -139,6 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           full_name: user?.user_metadata?.full_name || '',
           company_name: user?.user_metadata?.company_name || '',
           phone: user?.user_metadata?.phone || '',
+          role: 'user',
           is_admin: false,
         }
 
@@ -268,6 +272,66 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  const hasPermission = (resource: string, action: string): boolean => {
+    if (!userProfile) return false;
+    
+    // Admin has all permissions
+    if (userProfile.role === 'admin' || userProfile.is_admin) {
+      return true;
+    }
+    
+    // Define role permissions
+    const rolePermissions: Record<string, string[]> = {
+      admin: ['*'],
+      buyer: [
+        'rfq:create', 'rfq:read', 'rfq:update', 'rfq:delete',
+        'supplier:read', 'catalog:read', 'offer:read', 'verification:request'
+      ],
+      supplier: [
+        'rfq:read', 'catalog:create', 'catalog:read', 'catalog:update', 'catalog:delete',
+        'offer:create', 'offer:read', 'offer:update', 'verification:request'
+      ],
+      manager: [
+        'rfq:read', 'rfq:approve', 'supplier:read', 'catalog:read',
+        'offer:read', 'user:manage', 'analytics:read'
+      ]
+    };
+    
+    const permissions = rolePermissions[userProfile.role] || [];
+    
+    // Check for wildcard permission
+    if (permissions.includes('*')) {
+      return true;
+    }
+    
+    // Check for specific permission
+    const target = `${resource}:${action}`;
+    if (permissions.includes(target)) {
+      return true;
+    }
+    
+    // Check for resource-level permission (e.g., "rfq:*")
+    const resourceWildcard = `${resource}:*`;
+    if (permissions.includes(resourceWildcard)) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  const hasRole = (roles: string | string[]): boolean => {
+    if (!userProfile) return false;
+    
+    const rolesArray = Array.isArray(roles) ? roles : [roles];
+    
+    // Admin has all roles
+    if (userProfile.role === 'admin' || userProfile.is_admin) {
+      return true;
+    }
+    
+    return rolesArray.includes(userProfile.role);
+  };
+
   const value: AuthContextType = {
     user,
     userProfile,
@@ -277,6 +341,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signUp,
     signOut,
     updateProfile,
+    hasPermission,
+    hasRole
   }
 
   return (

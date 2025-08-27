@@ -1,1 +1,193 @@
-from fastapi import APIRouter, Depends, HTTPException, status\nfrom typing import Dict, Any, Optional\nfrom uuid import uuid4\nimport asyncio\n\nfrom app.core.auth import get_current_user_profile\nfrom app.core.database import get_db\nfrom app.core.redis_client import RedisService, get_redis\nfrom app.models.common import APIResponse, Job, JobCreate, JobStatus\nfrom supabase import Client\nfrom loguru import logger\n\nrouter = APIRouter()\n\n@router.post(\"/orchestrate\", response_model=APIResponse[Job])\nasync def orchestrate_workflow(\n    job_data: JobCreate,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Agent workflow'unu başlat\"\"\"\n    try:\n        # Job ID oluştur\n        job_id = str(uuid4())\n        \n        # Job verilerini hazırla\n        job_payload = {\n            \"id\": job_id,\n            \"job_type\": job_data.job_type,\n            \"status\": JobStatus.PENDING.value,\n            \"data\": job_data.data,\n            \"priority\": job_data.priority,\n            \"user_id\": current_user[\"id\"],\n            \"company_id\": current_user[\"company_id\"],\n            \"created_at\": \"now()\"\n        }\n        \n        # Redis'e job ekle\n        success = await RedisService.enqueue_task(\n            \"agent_jobs\", \n            job_payload\n        )\n        \n        if not success:\n            raise HTTPException(\n                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n                detail=\"Job kuyruğa eklenemedi\"\n            )\n        \n        # Job durumunu Redis'e kaydet\n        await RedisService.set_json(\n            f\"job:{job_id}\", \n            job_payload,\n            expire=3600  # 1 saat\n        )\n        \n        # Response job objesi oluştur\n        job_response = Job(\n            id=job_id,\n            job_type=job_data.job_type,\n            status=JobStatus.PENDING,\n            data=job_data.data,\n            priority=job_data.priority,\n            created_at=job_payload[\"created_at\"]\n        )\n        \n        logger.info(f\"Job {job_id} orchestrated for user {current_user['id']}\")\n        \n        return APIResponse(\n            success=True,\n            data=job_response,\n            message=f\"Workflow başlatıldı. Job ID: {job_id}\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Orchestration error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Workflow başlatılırken hata oluştu\"\n        )\n\n@router.get(\"/status/{job_id}\", response_model=APIResponse[Job])\nasync def get_job_status(\n    job_id: str,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Job durumunu sorgula\"\"\"\n    try:\n        # Redis'ten job durumunu getir\n        job_data = await RedisService.get_json(f\"job:{job_id}\")\n        \n        if not job_data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Job bulunamadı\"\n            )\n        \n        # Yetki kontrolü - sadece job sahibi görebilir\n        if job_data.get(\"user_id\") != current_user[\"id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu job'u görme yetkiniz yok\"\n            )\n        \n        # Job objesini oluştur\n        job_response = Job(\n            id=job_data[\"id\"],\n            job_type=job_data[\"job_type\"],\n            status=JobStatus(job_data[\"status\"]),\n            data=job_data.get(\"data\", {}),\n            result=job_data.get(\"result\"),\n            error=job_data.get(\"error\"),\n            priority=job_data.get(\"priority\", 1),\n            created_at=job_data[\"created_at\"],\n            updated_at=job_data.get(\"updated_at\"),\n            completed_at=job_data.get(\"completed_at\")\n        )\n        \n        return APIResponse(\n            success=True,\n            data=job_response\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Job status error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Job durumu sorgulanırken hata oluştu\"\n        )\n\n@router.post(\"/cancel/{job_id}\", response_model=APIResponse[Job])\nasync def cancel_job(\n    job_id: str,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Job'u iptal et\"\"\"\n    try:\n        # Redis'ten job durumunu getir\n        job_data = await RedisService.get_json(f\"job:{job_id}\")\n        \n        if not job_data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Job bulunamadı\"\n            )\n        \n        # Yetki kontrolü\n        if job_data.get(\"user_id\") != current_user[\"id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu job'u iptal etme yetkiniz yok\"\n            )\n        \n        # Zaten tamamlanmış veya başarısız job'lar iptal edilemez\n        current_status = job_data.get(\"status\")\n        if current_status in [JobStatus.COMPLETED.value, JobStatus.FAILED.value, JobStatus.CANCELLED.value]:\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=f\"Bu durumda ({current_status}) job iptal edilemez\"\n            )\n        \n        # Job'u iptal edildi olarak işaretle\n        job_data[\"status\"] = JobStatus.CANCELLED.value\n        job_data[\"updated_at\"] = \"now()\"\n        job_data[\"completed_at\"] = \"now()\"\n        \n        # Redis'e güncelleme\n        await RedisService.set_json(\n            f\"job:{job_id}\", \n            job_data,\n            expire=3600\n        )\n        \n        # İptal sinyali gönder (agent'lara)\n        cancel_signal = {\n            \"action\": \"cancel\",\n            \"job_id\": job_id,\n            \"cancelled_by\": current_user[\"id\"]\n        }\n        \n        await RedisService.enqueue_task(\n            \"agent_signals\",\n            cancel_signal\n        )\n        \n        # Response job objesi oluştur\n        job_response = Job(\n            id=job_data[\"id\"],\n            job_type=job_data[\"job_type\"],\n            status=JobStatus.CANCELLED,\n            data=job_data.get(\"data\", {}),\n            result=job_data.get(\"result\"),\n            error=job_data.get(\"error\"),\n            priority=job_data.get(\"priority\", 1),\n            created_at=job_data[\"created_at\"],\n            updated_at=job_data.get(\"updated_at\"),\n            completed_at=job_data.get(\"completed_at\")\n        )\n        \n        logger.info(f\"Job {job_id} cancelled by user {current_user['id']}\")\n        \n        return APIResponse(\n            success=True,\n            data=job_response,\n            message=\"Job başarıyla iptal edildi\"\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Job cancellation error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Job iptal edilirken hata oluştu\"\n        )\n\n@router.get(\"/jobs\", response_model=APIResponse[list])\nasync def get_user_jobs(\n    current_user = Depends(get_current_user_profile),\n    limit: int = 10,\n    db: Client = Depends(get_db)\n):\n    \"\"\"Kullanıcının job'larını listele\"\"\"\n    try:\n        # Bu basit bir implementasyon - production'da daha gelişmiş bir yaklaşım gerekir\n        # Redis'te tüm job'ları aramak performans açısından optimal değil\n        # Gerçek uygulamada job'lar ayrı bir veritabanı tablosunda da saklanmalı\n        \n        user_jobs = []\n        \n        # Bu geçici bir çözüm - production'da job history için ayrı tablo kullanın\n        logger.warning(\"get_user_jobs: This is a simplified implementation\")\n        \n        return APIResponse(\n            success=True,\n            data=user_jobs,\n            message=\"Bu endpoint geliştirilme aşamasında\"\n        )\n        \n    except Exception as e:\n        logger.error(f\"Get user jobs error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Job listesi alınırken hata oluştu\"\n        )\n\n@router.post(\"/workflows/rfq-discovery\", response_model=APIResponse[Job])\nasync def start_rfq_discovery_workflow(\n    rfq_id: str,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"RFQ keşif workflow'unu başlat\"\"\"\n    try:\n        # RFQ'nun varlığını ve yetkisini kontrol et\n        rfq_check = db.table(\"rfqs\").select(\n            \"id\", \"company_id\", \"title\", \"status\"\n        ).eq(\"id\", rfq_id).single().execute()\n        \n        if not rfq_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"RFQ bulunamadı\"\n            )\n        \n        if rfq_check.data[\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu RFQ için workflow başlatma yetkiniz yok\"\n            )\n        \n        # Workflow verilerini hazırla\n        workflow_data = JobCreate(\n            job_type=\"rfq_discovery\",\n            data={\n                \"rfq_id\": rfq_id,\n                \"rfq_title\": rfq_check.data[\"title\"],\n                \"user_id\": current_user[\"id\"],\n                \"company_id\": current_user[\"company_id\"]\n            }\n        )\n        \n        # Orchestrate workflow\n        return await orchestrate_workflow(workflow_data, current_user, db)\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"RFQ discovery workflow error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"RFQ keşif workflow'u başlatılırken hata oluştu\"\n        )\n\n@router.post(\"/workflows/supplier-verification\", response_model=APIResponse[Job])\nasync def start_supplier_verification_workflow(\n    supplier_id: str,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Tedarikçi doğrulama workflow'unu başlat\"\"\"\n    try:\n        # Tedarikçi varlık kontrolü\n        supplier_check = db.table(\"suppliers\").select(\n            \"id\", \"company_id\", \"companies(name, email)\"\n        ).eq(\"id\", supplier_id).single().execute()\n        \n        if not supplier_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Tedarikçi bulunamadı\"\n            )\n        \n        # Workflow verilerini hazırla\n        workflow_data = JobCreate(\n            job_type=\"supplier_verification\",\n            data={\n                \"supplier_id\": supplier_id,\n                \"company_name\": supplier_check.data[\"companies\"][\"name\"],\n                \"company_email\": supplier_check.data[\"companies\"][\"email\"],\n                \"requester_id\": current_user[\"id\"],\n                \"requester_company_id\": current_user[\"company_id\"]\n            }\n        )\n        \n        # Orchestrate workflow\n        return await orchestrate_workflow(workflow_data, current_user, db)\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Supplier verification workflow error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Tedarikçi doğrulama workflow'u başlatılırken hata oluştu\"\n        )\n
+from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import uuid4
+import json
+
+from app.core.auth import get_current_user_profile
+from app.core.database import get_db
+from app.core.redis_client import RedisService, get_redis
+from app.models.common import APIResponse, Job, JobCreate, JobStatus
+from supabase import Client
+from loguru import logger
+
+
+router = APIRouter()
+
+
+@router.post("/orchestrate", response_model=APIResponse[Job])
+async def orchestrate_workflow(
+    job_data: JobCreate,
+    current_user=Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+):
+    """Agent workflow'unu başlat"""
+    try:
+        job_id = str(uuid4())
+        job_payload = {
+            "id": job_id,
+            "job_type": job_data.job_type,
+            "status": JobStatus.PENDING.value,
+            "data": job_data.data,
+            "priority": job_data.priority,
+            "user_id": current_user["id"],
+            "company_id": current_user["company_id"],
+            "created_at": "now()",
+        }
+        success = await RedisService.enqueue_task("agent_jobs", job_payload)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Job kuyruğa eklenemedi",
+            )
+        await RedisService.set_json(f"job:{job_id}", job_payload, expire=3600)
+        job_response = Job(
+            id=job_id,
+            job_type=job_data.job_type,
+            status=JobStatus.PENDING,
+            data=job_data.data,
+            priority=job_data.priority,
+            created_at=job_payload["created_at"],
+        )
+        logger.info(f"Job {job_id} orchestrated for user {current_user['id']}")
+        return APIResponse(success=True, data=job_response, message=f"Workflow başlatıldı. Job ID: {job_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Orchestration error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Workflow başlatılırken hata oluştu")
+
+
+@router.get("/status/{job_id}", response_model=APIResponse[Job])
+async def get_job_status(
+    job_id: str,
+    current_user=Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+):
+    """Job durumunu sorgula"""
+    try:
+        job_data = await RedisService.get_json(f"job:{job_id}")
+        if not job_data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job bulunamadı")
+        if job_data.get("user_id") != current_user["id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu job'u görme yetkiniz yok")
+        job_response = Job(
+            id=job_data["id"],
+            job_type=job_data["job_type"],
+            status=JobStatus(job_data["status"]),
+            data=job_data.get("data", {}),
+            result=job_data.get("result"),
+            error=job_data.get("error"),
+            priority=job_data.get("priority", 1),
+            created_at=job_data["created_at"],
+            updated_at=job_data.get("updated_at"),
+            completed_at=job_data.get("completed_at"),
+        )
+        return APIResponse(success=True, data=job_response)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Job status error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Job durumu sorgulanırken hata oluştu")
+
+
+@router.post("/cancel/{job_id}", response_model=APIResponse[Job])
+async def cancel_job(
+    job_id: str,
+    current_user=Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+):
+    """Job'u iptal et"""
+    try:
+        job_data = await RedisService.get_json(f"job:{job_id}")
+        if not job_data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job bulunamadı")
+        if job_data.get("user_id") != current_user["id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu job'u iptal etme yetkiniz yok")
+        current_status = job_data.get("status")
+        if current_status in [JobStatus.COMPLETED.value, JobStatus.FAILED.value, JobStatus.CANCELLED.value]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Bu durumda ({current_status}) job iptal edilemez")
+        job_data["status"] = JobStatus.CANCELLED.value
+        job_data["updated_at"] = "now()"
+        job_data["completed_at"] = "now()"
+        await RedisService.set_json(f"job:{job_id}", job_data, expire=3600)
+        cancel_signal = {"action": "cancel", "job_id": job_id, "cancelled_by": current_user["id"]}
+        await RedisService.enqueue_task("agent_signals", cancel_signal)
+        job_response = Job(
+            id=job_data["id"],
+            job_type=job_data["job_type"],
+            status=JobStatus.CANCELLED,
+            data=job_data.get("data", {}),
+            result=job_data.get("result"),
+            error=job_data.get("error"),
+            priority=job_data.get("priority", 1),
+            created_at=job_data["created_at"],
+            updated_at=job_data.get("updated_at"),
+            completed_at=job_data.get("completed_at"),
+        )
+        logger.info(f"Job {job_id} cancelled by user {current_user['id']}")
+        return APIResponse(success=True, data=job_response, message="Job başarıyla iptal edildi")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Job cancellation error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Job iptal edilirken hata oluştu")
+
+
+@router.get("/jobs", response_model=APIResponse[list])
+async def get_user_jobs(
+    current_user=Depends(get_current_user_profile),
+    limit: int = 20,
+    db: Client = Depends(get_db),
+):
+    """Kullanıcının job'larını Redis üzerinden basitçe listele"""
+    try:
+        r = get_redis()
+        if r is None:
+            return APIResponse(success=True, data=[], message="Redis bağlı değil")
+        jobs = []
+        async for key in r.scan_iter(match="job:*", count=100):
+            raw = await r.get(key)
+            if not raw:
+                continue
+            try:
+                job = json.loads(raw)
+            except Exception:
+                continue
+            if job.get("user_id") == current_user["id"]:
+                jobs.append(job)
+            if len(jobs) >= limit:
+                break
+        return APIResponse(success=True, data=jobs)
+    except Exception as e:
+        logger.error(f"Get user jobs error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Job listesi alınırken hata oluştu")
+
+
+@router.post("/workflows/rfq-discovery", response_model=APIResponse[Job])
+async def start_rfq_discovery_workflow(
+    rfq_id: str,
+    current_user=Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+):
+    """RFQ keşif workflow'unu başlat"""
+    try:
+        rfq_check = db.table("rfqs").select("id", "company_id", "title", "status").eq("id", rfq_id).single().execute()
+        if not rfq_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ bulunamadı")
+        if rfq_check.data["company_id"] != current_user["company_id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu RFQ için workflow başlatma yetkiniz yok")
+        workflow_data = JobCreate(
+            job_type="rfq_discovery",
+            data={
+                "rfq_id": rfq_id,
+                "rfq_title": rfq_check.data["title"],
+                "user_id": current_user["id"],
+                "company_id": current_user["company_id"],
+            },
+        )
+        return await orchestrate_workflow(workflow_data, current_user, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"RFQ workflow error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Workflow başlatılırken hata oluştu")
+

@@ -2,10 +2,10 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from './ui/Button'
-import { LogOut, User, Settings, FileText, Shield } from 'lucide-react'
+import { LogOut, User, Settings, FileText, Shield, FilePlus, CheckCircle, KeyRound, ShoppingBasket, Workflow, Users, Building, Truck } from 'lucide-react'
 
 export function Navbar() {
-  const { user, userProfile, signOut } = useAuth()
+  const { user, userProfile, signOut, hasRole } = useAuth()
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
@@ -44,13 +44,72 @@ export function Navbar() {
                 Dashboard
               </Link>
               
-              {userProfile?.is_admin && (
+              {/* Buyer-specific navigation */}
+              {hasRole(['buyer', 'admin', 'manager']) && (
+                <>
+                  <Link
+                    to="/rfq/templates"
+                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
+                  >
+                    <FilePlus className="h-4 w-4 mr-2" />
+                    RFQ Şablonları
+                  </Link>
+                  <Link
+                    to="/rfq/new"
+                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Yeni RFQ
+                  </Link>
+                </>
+              )}
+              
+              {/* Supplier-specific navigation */}
+              {hasRole(['supplier', 'admin']) && (
+                <Link
+                  to="/catalog"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
+                >
+                  <ShoppingBasket className="h-4 w-4 mr-2" />
+                  Katalog
+                </Link>
+              )}
+              
+              <Link
+                to="/jobs"
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
+              >
+                <Workflow className="h-4 w-4 mr-2" />
+                İşler
+              </Link>
+              
+              <Link
+                to="/verification"
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Doğrulama
+              </Link>
+              
+              {/* Admin-specific navigation */}
+              {hasRole('admin') && (
                 <Link
                   to="/admin"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
                 >
                   <Shield className="h-4 w-4 mr-2" />
                   Admin Panel
+                </Link>
+              )}
+              
+              {/* Manager-specific navigation */}
+              {hasRole(['manager', 'admin']) && (
+                <Link
+                  to="/team"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300 transition-colors"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Takım
                 </Link>
               )}
             </div>
@@ -65,18 +124,18 @@ export function Navbar() {
                 </p>
                 <p className="text-xs text-gray-500">
                   {userProfile?.company_name || user?.email}
+                  {userProfile?.role && (
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {userProfile.role}
+                    </span>
+                  )}
                 </p>
               </div>
               
               <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-2"
-                  title="Profil Ayarları"
-                >
-                  <User className="h-4 w-4" />
-                </Button>
+                <Link to="/settings/2fa" title="2FA Ayarları" className="inline-flex p-2 text-gray-600 hover:text-gray-800">
+                  <KeyRound className="h-4 w-4" />
+                </Link>
                 
                 <Button
                   variant="ghost"

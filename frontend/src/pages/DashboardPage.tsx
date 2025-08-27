@@ -58,6 +58,11 @@ export function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [filterCategory, setFilterCategory] = useState<string>('')
+  const [starting, setStarting] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'created_at' | 'updated_at' | 'deadline_date'>('created_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const loadDashboardData = async (showRefreshing = false) => {
     try {
@@ -67,9 +72,12 @@ export function DashboardPage() {
       // Load RFQs from backend API
       const rfqsResponse = await apiClient.getRFQs({
         page,
-        per_page: 10,
+        per_page: perPage,
         status: filterStatus || undefined,
-      })
+        category: filterCategory || undefined,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+      } as any)
 
       // Load analytics from backend API
       const analyticsResponse = await apiClient.getRFQAnalytics()
@@ -115,7 +123,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData()
-  }, [page, filterStatus])
+  }, [page, perPage, filterStatus, filterCategory, sortBy, sortDir])
 
   const filteredRfqs = rfqs.filter(rfq =>
     rfq.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -300,6 +308,28 @@ export function DashboardPage() {
                   <option value="in_progress">İşlemde</option>
                   <option value="completed">Tamamlandı</option>
                 </select>
+                <Input
+                  placeholder="Kategori (opsiyonel)"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value.toLowerCase())}
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+                >
+                  <option value="created_at">Oluşturma</option>
+                  <option value="updated_at">Güncelleme</option>
+                  <option value="deadline_date">Son Tarih</option>
+                </select>
+                <select
+                  value={sortDir}
+                  onChange={(e) => setSortDir(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+                >
+                  <option value="desc">Azalan</option>
+                  <option value="asc">Artan</option>
+                </select>
               </div>
             </div>
           </CardHeader>
@@ -363,7 +393,7 @@ export function DashboardPage() {
                       </div>
                       <div>
                         <span className="font-medium">Son Tarih:</span>
-                        <p>{formatDate(rfq.deadline)}</p>
+                        <p>{formatDate((rfq as any).deadline || (rfq as any).deadline_date)}</p>
                       </div>
                       <div>
                         <span className="font-medium">Oluşturma:</span>
@@ -385,7 +415,34 @@ export function DashboardPage() {
                       </div>
                     )}
                     
-                    <div className="flex justify-end mt-4">
+                    <div className="flex justify-end mt-4 gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/rfq/${rfq.id}`) }}
+                      >
+                        Detay
+                      </Button>
+                      <Button
+                        disabled={starting === rfq.id || ['in_progress','completed'].includes((rfq as any).status)}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          try {
+                            setStarting(rfq.id)
+                            const res: any = await apiClient.orchestrateJob({ job_type: 'rfq_process', rfq_id: rfq.id })
+                            if (res?.success) {
+                              toast.success('Workflow başlatıldı')
+                            } else {
+                              toast.error(res?.message || 'Başlatma hatası')
+                            }
+                          } catch (err: any) {
+                            toast.error(err?.message || 'Hata')
+                          } finally {
+                            setStarting(null)
+                          }
+                        }}
+                      >
+                        {starting === rfq.id ? 'Başlatılıyor...' : 'Workflow Başlat'}
+                      </Button>
                       <ChevronRight className="h-5 w-5 text-gray-400" />
                     </div>
                   </div>
@@ -394,6 +451,19 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Pagination controls */}
+        <div className="flex items-center justify-between mt-6">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Önceki</Button>
+            <span className="text-sm">Sayfa {page}</span>
+            <Button variant="outline" onClick={() => setPage(p => p + 1)}>Sonraki</Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Sayfa Boyutu</span>
+            <Input style={{ width: '80px' }} value={String(perPage)} onChange={(e) => setPerPage(Math.max(1, Number(e.target.value) || 10))} />
+          </div>
+        </div>
       </div>
     </div>
   )

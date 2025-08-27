@@ -172,3 +172,71 @@
 2025-08-25 00:25:46.053 | INFO     | __main__:main:26 - Agent Orchestrator is starting...
 2025-08-25 00:25:46.053 | INFO     | orchestrator:start:45 - Starting Agent Orchestrator...
 2025-08-25 00:25:46.054 | INFO     | orchestrator:_process_main_jobs:70 - Started main job processor
+2025-08-25 01:51:30.697 | ERROR    | orchestrator:_process_main_jobs:87 - Error in main job processor: Connection closed by server.
+2025-08-25 01:51:30.713 | INFO     | orchestrator:_run_agent_worker:93 - Started rfq_intake worker on queue agentik:agent:rfq_intake
+2025-08-25 01:51:30.720 | ERROR    | orchestrator:_run_agent_worker:122 - Error in rfq_intake worker: Error 111 connecting to redis:6379. Connection refused.
+2025-08-25 01:51:30.722 | INFO     | orchestrator:_run_agent_worker:93 - Started supplier_discovery worker on queue agentik:agent:supplier_discovery
+2025-08-25 01:51:30.769 | ERROR    | orchestrator:_run_agent_worker:122 - Error in supplier_discovery worker: Error 111 connecting to redis:6379. Connection refused.
+2025-08-25 01:51:30.771 | INFO     | orchestrator:_run_agent_worker:93 - Started email_send worker on queue agentik:agent:email_send
+2025-08-25 01:51:30.773 | ERROR    | orchestrator:_run_agent_worker:122 - Error in email_send worker: Error 111 connecting to redis:6379. Connection refused.
+2025-08-25 01:51:30.802 | INFO     | orchestrator:_run_agent_worker:93 - Started inbox_parser worker on queue agentik:agent:inbox_parser
+2025-08-25 01:51:30.804 | ERROR    | orchestrator:_run_agent_worker:122 - Error in inbox_parser worker: Error 111 connecting to redis:6379. Connection refused.
+2025-08-25 01:51:30.805 | INFO     | orchestrator:_run_agent_worker:93 - Started supplier_verifier worker on queue agentik:agent:supplier_verifier
+2025-08-25 01:51:30.807 | ERROR    | orchestrator:_run_agent_worker:122 - Error in supplier_verifier worker: Error 111 connecting to redis:6379. Connection refused.
+2025-08-25 01:51:30.807 | INFO     | orchestrator:_run_agent_worker:93 - Started aggregation_report worker on queue agentik:agent:aggregation_report
+2025-08-25 01:51:30.808 | ERROR    | orchestrator:_run_agent_worker:122 - Error in aggregation_report worker: Error 111 connecting to redis:6379. Connection refused.
+2025-08-25 01:51:35.178 | ERROR    | orchestrator:_process_main_jobs:87 - Error in main job processor: Error -2 connecting to redis:6379. Name or service not known.
+2025-08-25 12:27:07.558 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-25 12:27:07.561 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-25 12:27:07.562 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-25 12:27:07.562 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-25 12:27:07.563 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-25 12:27:07.563 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-25 12:27:07.564 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://axruesovbkcrejdczqhw.supabase.co
+2025-08-25 12:27:07.565 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Not set
+2025-08-25 12:27:07.565 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-25 12:27:07.566 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-25 12:27:07.593 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-25 12:27:07.594 | INFO     | agents:__init__:33 - [rfq_intake] Initializing agent with mock database client
+2025-08-25 12:27:07.595 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:27:07.595 | INFO     | agents:__init__:33 - [supplier_discovery] Initializing agent with mock database client
+2025-08-25 12:27:07.596 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:27:07.596 | INFO     | agents:__init__:33 - [email_send] Initializing agent with mock database client
+2025-08-25 12:27:07.597 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:27:07.597 | INFO     | agents:__init__:33 - [inbox_parser] Initializing agent with mock database client
+2025-08-25 12:27:07.598 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:27:07.598 | INFO     | agents:__init__:33 - [supplier_verifier] Initializing agent with mock database client
+2025-08-25 12:27:07.599 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:27:07.599 | INFO     | agents:__init__:33 - [aggregation_report] Initializing agent with mock database client
+2025-08-25 12:27:07.600 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:27:07.601 | INFO     | __main__:main:18 - Health check: {'orchestrator': {'running': False, 'agents_count': 6, 'timestamp': '2025-08-25T12:27:07.600746'}, 'agents': {'rfq_intake': {'status': 'healthy', 'queue_size': 0}, 'supplier_discovery': {'status': 'healthy', 'queue_size': 0}, 'email_send': {'status': 'healthy', 'queue_size': 0}, 'inbox_parser': {'status': 'healthy', 'queue_size': 0}, 'supplier_verifier': {'status': 'healthy', 'queue_size': 0}, 'aggregation_report': {'status': 'healthy', 'queue_size': 0}}, 'redis': {'status': 'healthy', 'connected': True}}
+2025-08-25 12:27:07.602 | INFO     | __main__:main:26 - Agent Orchestrator is starting...
+2025-08-25 12:27:07.602 | INFO     | orchestrator:start:45 - Starting Agent Orchestrator...
+2025-08-25 12:27:07.603 | INFO     | orchestrator:_process_main_jobs:70 - Started main job processor
+2025-08-25 12:44:44.277 | INFO     | __main__:<module>:40 - ==================================================
+2025-08-25 12:44:44.281 | INFO     | __main__:<module>:41 - Agentik B2B Agent Orchestrator
+2025-08-25 12:44:44.281 | INFO     | __main__:<module>:42 - ==================================================
+2025-08-25 12:44:44.282 | INFO     | __main__:<module>:43 - Python version: 3.11.13 (main, Aug 12 2025, 22:45:40) [GCC 14.2.0]
+2025-08-25 12:44:44.282 | INFO     | __main__:<module>:44 - Environment variables loaded:
+2025-08-25 12:44:44.282 | INFO     | __main__:<module>:45 -   - REDIS_URL: redis://redis:6379
+2025-08-25 12:44:44.283 | INFO     | __main__:<module>:46 -   - SUPABASE_URL: https://axruesovbkcrejdczqhw.supabase.co
+2025-08-25 12:44:44.283 | INFO     | __main__:<module>:47 -   - EMAIL_USERNAME: Not set
+2025-08-25 12:44:44.283 | INFO     | __main__:<module>:48 - ==================================================
+2025-08-25 12:44:44.284 | INFO     | __main__:main:11 - Starting Agentik Agent Orchestrator System
+2025-08-25 12:44:44.359 | INFO     | utils:get_redis_connection:14 - Connected to Redis at redis://redis:6379
+2025-08-25 12:44:44.359 | INFO     | agents:__init__:33 - [rfq_intake] Initializing agent with mock database client
+2025-08-25 12:44:44.360 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:44:44.360 | INFO     | agents:__init__:33 - [supplier_discovery] Initializing agent with mock database client
+2025-08-25 12:44:44.360 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:44:44.361 | INFO     | agents:__init__:33 - [email_send] Initializing agent with mock database client
+2025-08-25 12:44:44.361 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:44:44.362 | INFO     | agents:__init__:33 - [inbox_parser] Initializing agent with mock database client
+2025-08-25 12:44:44.362 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:44:44.362 | INFO     | agents:__init__:33 - [supplier_verifier] Initializing agent with mock database client
+2025-08-25 12:44:44.363 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:44:44.363 | INFO     | agents:__init__:33 - [aggregation_report] Initializing agent with mock database client
+2025-08-25 12:44:44.364 | INFO     | mock_database:__init__:222 - Initialized mock Supabase client for agents
+2025-08-25 12:44:44.365 | INFO     | __main__:main:18 - Health check: {'orchestrator': {'running': False, 'agents_count': 6, 'timestamp': '2025-08-25T12:44:44.364431'}, 'agents': {'rfq_intake': {'status': 'healthy', 'queue_size': 0}, 'supplier_discovery': {'status': 'healthy', 'queue_size': 0}, 'email_send': {'status': 'healthy', 'queue_size': 0}, 'inbox_parser': {'status': 'healthy', 'queue_size': 0}, 'supplier_verifier': {'status': 'healthy', 'queue_size': 0}, 'aggregation_report': {'status': 'healthy', 'queue_size': 0}}, 'redis': {'status': 'healthy', 'connected': True}}
+2025-08-25 12:44:44.365 | INFO     | __main__:main:26 - Agent Orchestrator is starting...
+2025-08-25 12:44:44.365 | INFO     | orchestrator:start:45 - Starting Agent Orchestrator...
+2025-08-25 12:44:44.366 | INFO     | orchestrator:_process_main_jobs:70 - Started main job processor

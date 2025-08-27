@@ -15,6 +15,7 @@ interface RFQFormData {
   category: string
   quantity: number
   unit: string
+  currency?: string
   budget_min?: number
   budget_max?: number
   deadline: string
@@ -55,6 +56,8 @@ const priorities = [
 
 export function RFQFormPage() {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<RFQFormData>()
+  const budgetMin = watch('budget_min')
+  const budgetMax = watch('budget_max')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -70,38 +73,40 @@ export function RFQFormPage() {
     try {
       // Format data for backend
       const formattedData = {
-        ...data,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        quantity: Number(data.quantity),
+        unit: data.unit,
+        // Backend RFQCreate expects `deadline` (datetime); backend convert to date
         deadline: new Date(data.deadline).toISOString(),
-        priority: data.priority || 'medium'
+        delivery_location: data.delivery_location,
+        budget_min: data.budget_min ? Number(data.budget_min) : undefined,
+        budget_max: data.budget_max ? Number(data.budget_max) : undefined,
+        priority: data.priority || 'medium',
+        requirements: data.requirements || undefined,
       }
       
       // Create RFQ
       const response = await apiClient.createRFQ(formattedData)
       
-      if (response.success && response.data?.rfq) {
-        const rfqId = response.data.rfq.id
+      if (response.success && (response.data as any)?.rfq?.id) {
+        const rfqId = (response.data as any).rfq.id as string
         setSuccess(true)
         
-        // Start agent workflow
+        // Start agent workflow (optional, best-effort)
         try {
-          const workflowResponse = await apiClient.startWorkflow({
-            job_type: 'rfq_process',
-            rfq_id: rfqId,
-            payload: {
-              rfq: response.data.rfq
-            }
-          })
-          
-          if (workflowResponse.success && workflowResponse.data?.job_id) {
-            setJobId(workflowResponse.data.job_id)
+          const wf = await apiClient.orchestrateJob({ job_type: 'rfq_process', rfq_id: rfqId }) as any
+          if (wf?.success && wf?.data?.job_id) {
+            setJobId(wf.data.job_id)
           }
         } catch (workflowError) {
           console.error('Failed to start workflow:', workflowError)
         }
         
-        // Redirect after 3 seconds
+        // Redirect after 3 seconds to RFQ detail
         setTimeout(() => {
-          navigate('/dashboard')
+          navigate(`/rfqs/${rfqId}`)
         }, 3000)
       } else {
         throw new Error(response.message || 'RFQ creation failed')
@@ -292,8 +297,12 @@ export function RFQFormPage() {
                 </div>
               </div>
 
-              {/* Budget Range */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Currency & Budget Range */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Para Birimi</label>
+                  <Input {...register('currency')} placeholder="USD" />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Minimum Bütçe ($)
@@ -309,14 +318,18 @@ export function RFQFormPage() {
                   )}
                 </div>
 
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Maksimum Bütçe ($)
                   </label>
                   <Input
                     type="number"
                     step="0.01"
-                    {...register('budget_max', { min: { value: 0, message: 'Bütçe negatif olamaz' } })}
+                    {...register('budget_max', {
+                      min: { value: 0, message: 'Bütçe negatif olamaz' },
+                      validate: (v) =>
+                        v === undefined || budgetMin === undefined || Number(v) > Number(budgetMin) || 'Maksimum, minimumdan büyük olmalı'
+                    })}
                     placeholder="5000.00"
                   />
                   {errors.budget_max && (

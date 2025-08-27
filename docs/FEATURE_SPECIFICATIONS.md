@@ -29,6 +29,15 @@ This document provides detailed feature specifications, user stories, and accept
 - Buyer-specific dashboard components
 - Permission middleware for API endpoints
 - Company association for buyers
+ - 2FA support (TOTP) with enable/disable endpoints
+
+#### RBAC Permission Codes (Initial)
+- RFQ: `rfq:create`, `rfq:read`, `rfq:update`, `rfq:delete`
+- Supplier: `supplier:read`
+- Quote: `quote:create`, `quote:update`, `quote:read`
+
+Acceptance Addendum:
+- [ ] Endpoints return 403 when user lacks required permission
 
 #### User Story 1.1.2: Supplier Role Implementation
 **As a supplier,** I want to have a supplier account so that I can receive RFQ notifications, submit quotes, and manage my product catalog.
@@ -99,6 +108,7 @@ This document provides detailed feature specifications, user stories, and accept
 - Industry-specific validation rules
 - Compliance checklist integration
 - Document requirement tracking
+ - RFQ Templates API (list/get, create via template)
 
 #### User Story 1.2.2: Electronics Industry Template
 **As an electronics buyer,** I want to use an electronics template so that I can specify technical requirements and certifications.
@@ -194,6 +204,20 @@ This document provides detailed feature specifications, user stories, and accept
 - File upload and storage system
 - Search and filtering capabilities
 - Bulk operation support
+ - Catalog API (mine/by-supplier, create/update/delete)
+
+### 1.4 Company Verification
+**As an admin, I want to review company verification requests so that verified suppliers are prioritized.**
+
+**Acceptance Criteria:**
+- [ ] Users can submit verification documents
+- [ ] Admin can approve verification and set company verified
+- [ ] Notifications created for request and decision
+
+**Technical Requirements:**
+- Attachments table for docs metadata
+- Notifications table for requests/decisions
+- Companies.verified flag update on approval
 
 #### User Story 1.3.4: Quote and Proposal Management
 **As a supplier,** I want to submit detailed quotes so that I can win more business.

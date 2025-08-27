@@ -108,6 +108,17 @@ ASCII alternatif (hızlı bakış):
 - Catalog API (min): `/catalog` CRUD + `/catalog/mine` ve `/catalog/supplier/{id}` uçları eklendi (filtre/paginasyon basit)
 - Utils: `/utils/upload` (multipart) eklendi; frontend doğrulama yüklemelerini açar
 - Verification (light): `/verification/request`, `/verification/requests`, `/verification/approve`, `/verification/reject` uçları ve entegrasyon testleri eklendi
+- Multi-role authentication system with role-based permissions and UI components
+- Database migrations for role management tables
+- Enhanced authentication system with proper role handling
+- Role management endpoints in the main application
+- Updated frontend AuthContext with role-based permissions
+- Updated Navbar with role-specific navigation
+- New Admin panel page for role management
+- API services and hooks for role management in the frontend
+- Role management component for the admin panel
+- Documentation updates for RBAC implementation
+- Backend and frontend RBAC tests
 
 ## 🔄 Devam Eden
 - Katalog sayfası: düzenleme/paginasyon/filtreler (frontend)
@@ -137,6 +148,7 @@ Phase 1 – Core Platform
 - [x] Frontend: 2FA sayfası
 - [x] Frontend: Katalog listesi ve ekleme/silme
 - [x] Admin: doğrulama talepleri listesi
+- [x] Multi-role authentication system with role-based permissions and UI components
 
 Phase 1 – UX ve Test İyileştirmeleri
 - [ ] Katalog düzenleme, arama, sayfalama UI cilası

@@ -31,12 +31,14 @@ cp .env.example .env
 ```env
 # Supabase Configuration
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-key
+SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Email Configuration
-EMAIL_USERNAME=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
 ```
 
 ### 3. Uygulamayı Başlatın
@@ -59,6 +61,13 @@ docker-compose up -d
 - **Backend API**: http://localhost:8000
 - **API Dokumentasyonu**: http://localhost:8000/docs
 - **Redis**: localhost:6379
+
+Yeni API Uçları (özet):
+- RFQ Şablonları: `GET /api/v1/rfqs/templates`, `GET /api/v1/rfqs/templates/{category}`, `POST /api/v1/rfqs/template`
+- Katalog: `GET /api/v1/catalog/mine`, `GET /api/v1/catalog/supplier/{id}`, `POST/PUT/DELETE /api/v1/catalog/*`
+- Doğrulama: `POST /api/v1/verification/request`, `POST /api/v1/verification/approve`
+- 2FA: `POST /api/v1/auth/2fa/setup|enable|disable`
+- Util: `GET /api/v1/utils/currency/rates|convert`
 
 ## 📋 Docker Komutları
 
@@ -95,7 +104,7 @@ docker-compose ps
 docker-compose exec backend bash
 
 # Database'e erişim (Supabase üzerinden)
-docker-compose exec backend python -c "from app.database import supabase; print(supabase)"
+docker-compose exec backend python -c "from app.core.database import supabase; print(supabase)"
 ```
 
 ### Yeniden Build Etme
@@ -151,6 +160,10 @@ docker-compose build backend
 - 🤖 **Agent Sistemi**: 6 özelleşmiş AI agent ile süreç otomasyonu
 - 🔐 **Güvenlik**: Row Level Security (RLS) ile veri koruması
 - 📱 **Responsive**: Tüm cihazlarda mükemmel kullanım deneyimi
+
+## 📈 Proje Takip
+
+Güncel durum, görseller ve yol haritası için `docs/PROJECT_TRACKING.md` ve özet ilerleme için `docs/PROGRESS_OVERVIEW.md` dokümanlarına bakın. Tüm dokümanlar `docs/` klasöründe toplanmıştır (bkz. `docs/README.md`).
 
 ## Teknoloji Yığını
 
@@ -218,6 +231,16 @@ docker-compose exec frontend npm test
 - **Row Level Security (RLS)**: Supabase veritabanında kullanıcı bazlı veri erişimi
 - **JWT Authentication**: Supabase Auth ile güvenli oturum yönetimi
 - **Environment Variables**: Hassas bilgilerin güvenli saklanması
+
+## 🗄️ Veritabanı Şeması
+
+Supabase üzerinde aşağıdaki ek alan ve tablolar gereklidir:
+- `companies.verified BOOLEAN DEFAULT FALSE`
+- `users.two_factor_secret TEXT`, `users.two_factor_enabled BOOLEAN DEFAULT FALSE`
+- Tablo: `supplier_products` (tedarikçi kataloğu)
+- Mevcut tablolar: `attachments`, `notifications`, `email_logs`
+
+Migrations klasöründe örnekleri yer alır: `supabase/migrations/*`.
 - **CORS**: Cross-origin isteklerin kontrollü yönetimi
 
 ## 📊 Monitoring ve Logging
@@ -304,7 +327,15 @@ Detaylı API dokümantasyonu için: http://localhost:8000/docs
 - `POST /orchestrate` - Agent workflow başlat
 - `GET /offers` - Teklif listesi
 
+## 📐 Wireframes & Konfigürasyon
+
+- Wireframes: `docs/WIREFRAMES.md` — temel ekran taslakları ve alanlar.
+- Konfigürasyon: `docs/CONFIGURATION_GUIDE.md` — ortam değişkenleri ve en iyi uygulamalar.
+  - Önemli env: `ALLOWED_ORIGINS` (CORS domain listesi), `PERMISSIONS_ENFORCED` (RBAC’i zorunlu kılar)
+
 ## 🤝 Katkıda Bulunma
+
+Katkı rehberi ve proje kuralları için bkz. [AGENTS.md](./AGENTS.md).
 
 1. Fork edin
 2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)

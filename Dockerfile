@@ -9,12 +9,13 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies (use structured backend requirements)
-COPY agentik-b2b-app/backend/requirements.txt ./requirements.txt
+# Copy repo requirements and install deps
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r ./requirements.txt
 
-# Copy structured backend application code
-COPY agentik-b2b-app/backend/app/ ./app/
+# Copy backend application code
+RUN rm -rf /app/app && mkdir -p /app/app
+COPY app/ /app/app/
 
 # Create logs directory
 RUN mkdir -p /app/logs

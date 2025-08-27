@@ -8,6 +8,15 @@ This document provides a comprehensive overview of the B2B Agentik Platform arch
 **Architecture Pattern:** Microservices with Event-Driven Architecture  
 **Deployment Model:** Containerized with Docker Support  
 
+Repository Layout (current):
+```
+app/                   # FastAPI backend (source of truth)
+frontend/              # React + Vite frontend
+agent_orchestrator/    # Agents/worker service
+docker-compose*.yml    # Compose files at repo root
+Makefile               # Dev commands
+```
+
 ---
 
 ## High-Level Architecture
@@ -226,15 +235,23 @@ PERMISSIONS = {
         "supplier:read", "quote:read", "order:create"
     ],
     "supplier": [
-        "rfq:read", "quote:create", "quote:update", 
+        "rfq:read", "quote:create", "quote:update",
         "catalog:manage", "profile:update"
     ],
-    "admin": ["*"],  # Full access
+    "admin": ["*"],
     "manager": [
-        "rfq:read", "rfq:approve", "user:manage", 
+        "rfq:read", "rfq:approve", "user:manage",
         "analytics:read", "report:generate"
     ]
 }
+
+def require_permission(permission: str):
+    async def _checker(user = Depends(get_current_user_profile)):
+        role = user.get("role")
+        if role not in PERMISSIONS and "*" not in PERMISSIONS.get(role, []):
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return True
+    return _checker
 ```
 
 ### Data Security

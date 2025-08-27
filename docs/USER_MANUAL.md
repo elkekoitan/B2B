@@ -323,6 +323,14 @@ Your comprehensive guide to streamlined B2B procurement and supplier management.
 ---
 
 ## Account Management
+### Two-Factor Authentication (2FA)
+- Setup: Go to Security > 2FA and click Setup to receive a secret/QR.
+- Enable: Enter the 6-digit code from your authenticator app.
+- Disable: Turn off from the same screen if needed.
+
+### Company Verification
+- Prepare documents (trade license, certifications) as PDFs.
+- Submit under Profile > Verification. After review, a badge appears on your company.
 
 ### 👤 Profile Management
 
@@ -569,3 +577,4 @@ We value your input! Help us improve the platform:
 
 *This user manual is regularly updated. Last revision: January 2024*
 *For the most current version, visit: help.agentik.com/user-manual*
+Note: Some actions require specific permissions. If you see a 403 error, contact your administrator to adjust your role or permissions.

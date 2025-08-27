@@ -1,0 +1,20 @@
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ['app/**']
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: ['frontend/**']
+
+agents:
+  - changed-files:
+      - any-glob-to-any-file: ['agent_orchestrator/**']
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '**/*.md']
+
+infra:
+  - changed-files:
+      - any-glob-to-any-file: ['Dockerfile', 'docker-compose*.yml', 'Makefile', '.github/**']
+

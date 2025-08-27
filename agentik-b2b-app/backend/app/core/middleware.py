@@ -1,1 +1,91 @@
-from fastapi import Request, HTTPException, status\nfrom fastapi.responses import JSONResponse\nfrom starlette.middleware.base import BaseHTTPMiddleware\nfrom loguru import logger\nimport time\nimport traceback\nfrom typing import Callable\n\nclass LoggingMiddleware(BaseHTTPMiddleware):\n    \"\"\"Request/Response logging middleware\"\"\"\n    \n    async def dispatch(self, request: Request, call_next: Callable):\n        start_time = time.time()\n        \n        # Request logging\n        logger.info(\n            f\"Request: {request.method} {request.url} - \"\n            f\"Headers: {dict(request.headers)} - \"\n            f\"Client: {request.client.host if request.client else 'unknown'}\"\n        )\n        \n        try:\n            response = await call_next(request)\n            \n            # Response logging\n            process_time = time.time() - start_time\n            logger.info(\n                f\"Response: {response.status_code} - \"\n                f\"Time: {process_time:.3f}s - \"\n                f\"Path: {request.url.path}\"\n            )\n            \n            return response\n            \n        except Exception as e:\n            # Error logging\n            process_time = time.time() - start_time\n            logger.error(\n                f\"Request failed: {request.method} {request.url} - \"\n                f\"Error: {str(e)} - \"\n                f\"Time: {process_time:.3f}s - \"\n                f\"Traceback: {traceback.format_exc()}\"\n            )\n            \n            # Return generic error response\n            return JSONResponse(\n                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n                content={\n                    \"success\": False,\n                    \"error\": \"Internal server error\",\n                    \"detail\": \"An unexpected error occurred\"\n                }\n            )\n\nclass SecurityHeadersMiddleware(BaseHTTPMiddleware):\n    \"\"\"Security headers middleware\"\"\"\n    \n    async def dispatch(self, request: Request, call_next: Callable):\n        response = await call_next(request)\n        \n        # Add security headers\n        response.headers[\"X-Content-Type-Options\"] = \"nosniff\"\n        response.headers[\"X-Frame-Options\"] = \"DENY\"\n        response.headers[\"X-XSS-Protection\"] = \"1; mode=block\"\n        response.headers[\"Referrer-Policy\"] = \"strict-origin-when-cross-origin\"\n        response.headers[\"Content-Security-Policy\"] = \"default-src 'self'\"\n        \n        return response\n\nclass RateLimitMiddleware(BaseHTTPMiddleware):\n    \"\"\"Simple rate limiting middleware\"\"\"\n    \n    def __init__(self, app, calls: int = 100, period: int = 60):\n        super().__init__(app)\n        self.calls = calls\n        self.period = period\n        self.clients = {}\n    \n    async def dispatch(self, request: Request, call_next: Callable):\n        client_ip = request.client.host if request.client else \"unknown\"\n        current_time = time.time()\n        \n        # Clean old entries\n        if client_ip in self.clients:\n            self.clients[client_ip] = [\n                timestamp for timestamp in self.clients[client_ip]\n                if current_time - timestamp < self.period\n            ]\n        else:\n            self.clients[client_ip] = []\n        \n        # Check rate limit\n        if len(self.clients[client_ip]) >= self.calls:\n            logger.warning(f\"Rate limit exceeded for IP: {client_ip}\")\n            return JSONResponse(\n                status_code=status.HTTP_429_TOO_MANY_REQUESTS,\n                content={\n                    \"success\": False,\n                    \"error\": \"Rate limit exceeded\",\n                    \"detail\": f\"Too many requests. Limit: {self.calls} per {self.period} seconds\"\n                }\n            )\n        \n        # Add current request timestamp\n        self.clients[client_ip].append(current_time)\n        \n        response = await call_next(request)\n        return response\n
+from fastapi import Request, status
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from loguru import logger
+import time
+import traceback
+from typing import Callable
+
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    """Request/Response logging middleware"""
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        start_time = time.time()
+        logger.info(
+            f"Request: {request.method} {request.url} - Headers: {dict(request.headers)} - "
+            f"Client: {request.client.host if request.client else 'unknown'}"
+        )
+        try:
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            logger.info(
+                f"Response: {response.status_code} - Time: {process_time:.3f}s - Path: {request.url.path}"
+            )
+            return response
+        except Exception as e:
+            process_time = time.time() - start_time
+            logger.error(
+                f"Request failed: {request.method} {request.url} - Error: {str(e)} - "
+                f"Time: {process_time:.3f}s - Traceback: {traceback.format_exc()}"
+            )
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={
+                    "success": False,
+                    "error": "Internal server error",
+                    "detail": "An unexpected error occurred",
+                },
+            )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Security headers middleware"""
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        return response
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Simple rate limiting middleware"""
+
+    def __init__(self, app, calls: int = 100, period: int = 60):
+        super().__init__(app)
+        self.calls = calls
+        self.period = period
+        self.clients = {}
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        client_ip = request.client.host if request.client else "unknown"
+        current_time = time.time()
+
+        # Clean old entries
+        if client_ip in self.clients:
+            self.clients[client_ip] = [
+                timestamp
+                for timestamp in self.clients[client_ip]
+                if current_time - timestamp < self.period
+            ]
+        else:
+            self.clients[client_ip] = []
+
+        if len(self.clients[client_ip]) >= self.calls:
+            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={
+                    "success": False,
+                    "error": "Rate limit exceeded",
+                    "detail": f"Too many requests. Limit: {self.calls} per {self.period} seconds",
+                },
+            )
+
+        self.clients[client_ip].append(current_time)
+        return await call_next(request)
+

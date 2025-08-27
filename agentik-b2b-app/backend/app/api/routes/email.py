@@ -1,1 +1,185 @@
-from fastapi import APIRouter, Depends, HTTPException, status\nfrom typing import List, Optional\nfrom uuid import UUID\n\nfrom app.core.auth import get_current_user_profile\nfrom app.core.database import get_db\nfrom app.models.email import EmailLog, EmailCreate, EmailType, EmailStatus\nfrom app.models.common import APIResponse, PaginatedResponse, FilterParams\nfrom supabase import Client\nfrom loguru import logger\n\nrouter = APIRouter()\n\n@router.get(\"/logs\", response_model=APIResponse[PaginatedResponse[EmailLog]])\nasync def get_email_logs(\n    params: FilterParams = Depends(),\n    email_type: Optional[EmailType] = None,\n    status_filter: Optional[EmailStatus] = None,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Email loglarını getir\"\"\"\n    try:\n        # Query builder - sadece kullanıcının şirketine ait emailler\n        query = db.table(\"email_logs\").select(\"*\")\n        \n        # Filters\n        if email_type:\n            query = query.eq(\"email_type\", email_type.value)\n        if status_filter:\n            query = query.eq(\"status\", status_filter.value)\n        if params.search:\n            query = query.or_(f\"subject.ilike.%{params.search}%,recipient_email.ilike.%{params.search}%\")\n        \n        # Pagination\n        offset = (params.page - 1) * params.size\n        query = query.range(offset, offset + params.size - 1)\n        \n        # Sorting\n        if params.sort_by:\n            ascending = params.sort_order == \"asc\"\n            query = query.order(params.sort_by, desc=not ascending)\n        else:\n            query = query.order(\"created_at\", desc=True)\n        \n        # Execute query\n        result = query.execute()\n        \n        # Get total count\n        count_query = db.table(\"email_logs\").select(\"id\", count=\"exact\")\n        if email_type:\n            count_query = count_query.eq(\"email_type\", email_type.value)\n        if status_filter:\n            count_query = count_query.eq(\"status\", status_filter.value)\n        \n        count_result = count_query.execute()\n        total = count_result.count or 0\n        \n        has_next = (params.page * params.size) < total\n        has_previous = params.page > 1\n        \n        paginated_data = PaginatedResponse(\n            data=result.data or [],\n            total=total,\n            page=params.page,\n            size=params.size,\n            has_next=has_next,\n            has_previous=has_previous\n        )\n        \n        return APIResponse(\n            success=True,\n            data=paginated_data\n        )\n        \n    except Exception as e:\n        logger.error(f\"Email logs error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Email logları alınırken hata oluştu\"\n        )\n\n@router.get(\"/logs/{email_id}\", response_model=APIResponse[EmailLog])\nasync def get_email_log_detail(\n    email_id: UUID,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Email log detayını getir\"\"\"\n    try:\n        result = db.table(\"email_logs\").select(\"*\").eq(\n            \"id\", str(email_id)\n        ).single().execute()\n        \n        if not result.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"Email log bulunamadı\"\n            )\n        \n        return APIResponse(\n            success=True,\n            data=result.data\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Email log detail error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Email log detayları alınırken hata oluştu\"\n        )\n\n@router.post(\"/send-rfq-invitation\", response_model=APIResponse[dict])\nasync def send_rfq_invitation(\n    rfq_id: UUID,\n    supplier_ids: List[UUID],\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"RFQ davetiyesi gönder\"\"\"\n    try:\n        # RFQ'nun sahibi mi kontrol et\n        rfq_check = db.table(\"rfqs\").select(\n            \"company_id\", \"title\", \"status\"\n        ).eq(\"id\", str(rfq_id)).single().execute()\n        \n        if not rfq_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"RFQ bulunamadı\"\n            )\n        \n        if rfq_check.data[\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu RFQ için davetiye gönderme yetkiniz yok\"\n            )\n        \n        if rfq_check.data[\"status\"] != \"published\":\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Sadece yayınlanmış RFQ'lar için davetiye gönderilebilir\"\n            )\n        \n        # Tedarikçilerin varlığını kontrol et\n        suppliers = db.table(\"suppliers\").select(\n            \"id\", \"companies(email, name)\"\n        ).in_(\"id\", [str(sid) for sid in supplier_ids]).execute()\n        \n        if not suppliers.data or len(suppliers.data) != len(supplier_ids):\n            raise HTTPException(\n                status_code=status.HTTP_400_BAD_REQUEST,\n                detail=\"Bazı tedarikçiler bulunamadı\"\n            )\n        \n        sent_count = 0\n        failed_suppliers = []\n        \n        # Her tedarikçiye davetiye gönder\n        for supplier in suppliers.data:\n            try:\n                # RFQ invitation kaydı oluştur\n                invitation_data = {\n                    \"rfq_id\": str(rfq_id),\n                    \"supplier_id\": supplier[\"id\"],\n                    \"invited_by\": current_user[\"id\"],\n                    \"status\": \"sent\"\n                }\n                \n                db.table(\"rfq_invitations\").insert(invitation_data).execute()\n                \n                # Email log oluştur\n                email_log_data = {\n                    \"sender_email\": current_user[\"email\"],\n                    \"recipient_email\": supplier[\"companies\"][\"email\"],\n                    \"subject\": f\"RFQ Davetiyesi: {rfq_check.data['title']}\",\n                    \"body\": f\"Sayın {supplier['companies']['name']}, {rfq_check.data['title']} başlıklı RFQ için teklifinizi bekliyoruz.\",\n                    \"email_type\": \"rfq_invitation\",\n                    \"rfq_id\": str(rfq_id),\n                    \"status\": \"pending\"\n                }\n                \n                db.table(\"email_logs\").insert(email_log_data).execute()\n                sent_count += 1\n                \n            except Exception as e:\n                logger.error(f\"Failed to send invitation to supplier {supplier['id']}: {e}\")\n                failed_suppliers.append(supplier[\"companies\"][\"name\"])\n        \n        result_data = {\n            \"sent_count\": sent_count,\n            \"total_suppliers\": len(supplier_ids),\n            \"failed_suppliers\": failed_suppliers\n        }\n        \n        message = f\"{sent_count} tedarikçiye davetiye gönderildi\"\n        if failed_suppliers:\n            message += f\", {len(failed_suppliers)} tedarikçiye gönderilemedi\"\n        \n        return APIResponse(\n            success=True,\n            data=result_data,\n            message=message\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"RFQ invitation error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"RFQ davetiyesi gönderilirken hata oluştu\"\n        )\n\n@router.get(\"/invitations/{rfq_id}\", response_model=APIResponse[List[dict]])\nasync def get_rfq_invitations(\n    rfq_id: UUID,\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"RFQ davetiyelerini getir\"\"\"\n    try:\n        # RFQ'nun sahibi mi kontrol et\n        rfq_check = db.table(\"rfqs\").select(\"company_id\").eq(\n            \"id\", str(rfq_id)\n        ).single().execute()\n        \n        if not rfq_check.data:\n            raise HTTPException(\n                status_code=status.HTTP_404_NOT_FOUND,\n                detail=\"RFQ bulunamadı\"\n            )\n        \n        if rfq_check.data[\"company_id\"] != current_user[\"company_id\"]:\n            raise HTTPException(\n                status_code=status.HTTP_403_FORBIDDEN,\n                detail=\"Bu RFQ'nun davetiyelerini görme yetkiniz yok\"\n            )\n        \n        # Davetiyeleri getir\n        result = db.table(\"rfq_invitations\").select(\n            \"*\", \n            \"suppliers(*, companies(*))\"\n        ).eq(\"rfq_id\", str(rfq_id)).order(\n            \"created_at\", desc=True\n        ).execute()\n        \n        return APIResponse(\n            success=True,\n            data=result.data or []\n        )\n        \n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"RFQ invitations error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"RFQ davetiyeleri alınırken hata oluştu\"\n        )\n\n@router.get(\"/stats\", response_model=APIResponse[dict])\nasync def get_email_stats(\n    current_user = Depends(get_current_user_profile),\n    db: Client = Depends(get_db)\n):\n    \"\"\"Email istatistiklerini getir\"\"\"\n    try:\n        # Toplam gönderilen email sayısı\n        total_emails = db.table(\"email_logs\").select(\n            \"id\", count=\"exact\"\n        ).execute()\n        \n        # Başarılı gönderimler\n        sent_emails = db.table(\"email_logs\").select(\n            \"id\", count=\"exact\"\n        ).eq(\"status\", \"sent\").execute()\n        \n        # Teslim edilen emailler\n        delivered_emails = db.table(\"email_logs\").select(\n            \"id\", count=\"exact\"\n        ).eq(\"status\", \"delivered\").execute()\n        \n        # Açılan emailler\n        opened_emails = db.table(\"email_logs\").select(\n            \"id\", count=\"exact\"\n        ).eq(\"status\", \"opened\").execute()\n        \n        # Başarısız gönderimler\n        failed_emails = db.table(\"email_logs\").select(\n            \"id\", count=\"exact\"\n        ).eq(\"status\", \"failed\").execute()\n        \n        total_count = total_emails.count or 0\n        sent_count = sent_emails.count or 0\n        delivered_count = delivered_emails.count or 0\n        opened_count = opened_emails.count or 0\n        failed_count = failed_emails.count or 0\n        \n        stats = {\n            \"total_emails\": total_count,\n            \"sent_emails\": sent_count,\n            \"delivered_emails\": delivered_count,\n            \"opened_emails\": opened_count,\n            \"failed_emails\": failed_count,\n            \"delivery_rate\": round(delivered_count / max(sent_count, 1) * 100, 2),\n            \"open_rate\": round(opened_count / max(delivered_count, 1) * 100, 2),\n            \"success_rate\": round(sent_count / max(total_count, 1) * 100, 2)\n        }\n        \n        return APIResponse(\n            success=True,\n            data=stats\n        )\n        \n    except Exception as e:\n        logger.error(f\"Email stats error: {e}\")\n        raise HTTPException(\n            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n            detail=\"Email istatistikleri alınırken hata oluştu\"\n        )\n
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from uuid import UUID
+
+from app.core.auth import get_current_user_profile
+from app.core.database import get_db
+from app.core.permissions import require_permission
+from app.models.email import EmailLog, EmailType, EmailStatus
+from app.models.common import APIResponse, PaginatedResponse, FilterParams
+from supabase import Client
+from loguru import logger
+
+router = APIRouter()
+
+
+@router.get("/logs", response_model=APIResponse[PaginatedResponse[EmailLog]])
+async def get_email_logs(
+    params: FilterParams = Depends(),
+    email_type: Optional[EmailType] = None,
+    status_filter: Optional[EmailStatus] = None,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("email:read")),
+):
+    try:
+        query = db.table("email_logs").select("*")
+        if email_type:
+            query = query.eq("email_type", email_type.value)
+        if status_filter:
+            query = query.eq("status", status_filter.value)
+        if params.search:
+            query = query.or_(f"subject.ilike.%{params.search}%,recipient_email.ilike.%{params.search}%")
+        offset = (params.page - 1) * params.size
+        query = query.range(offset, offset + params.size - 1)
+        if params.sort_by:
+            ascending = params.sort_order == "asc"
+            query = query.order(params.sort_by, desc=not ascending)
+        else:
+            query = query.order("created_at", desc=True)
+        result = query.execute()
+        count_query = db.table("email_logs").select("id", count="exact")
+        if email_type:
+            count_query = count_query.eq("email_type", email_type.value)
+        if status_filter:
+            count_query = count_query.eq("status", status_filter.value)
+        count_result = count_query.execute()
+        total = count_result.count or 0
+        has_next = (params.page * params.size) < total
+        has_previous = params.page > 1
+        paginated_data = PaginatedResponse(
+            data=result.data or [],
+            total=total,
+            page=params.page,
+            size=params.size,
+            has_next=has_next,
+            has_previous=has_previous,
+        )
+        return APIResponse(success=True, data=paginated_data)
+    except Exception as e:
+        logger.error(f"Email logs error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Email logları alınırken hata oluştu")
+
+
+@router.get("/logs/{email_id}", response_model=APIResponse[EmailLog])
+async def get_email_log_detail(
+    email_id: UUID,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("email:read")),
+):
+    try:
+        result = db.table("email_logs").select("*").eq("id", str(email_id)).single().execute()
+        if not result.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email log bulunamadı")
+        return APIResponse(success=True, data=result.data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Email log detail error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Email log detayları alınırken hata oluştu")
+
+
+@router.post("/send-rfq-invitation", response_model=APIResponse[dict])
+async def send_rfq_invitation(
+    rfq_id: UUID,
+    supplier_ids: List[UUID],
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("email:send")),
+):
+    try:
+        rfq_check = db.table("rfqs").select("company_id", "title", "status").eq("id", str(rfq_id)).single().execute()
+        if not rfq_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ bulunamadı")
+        if rfq_check.data["company_id"] != current_user["company_id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu RFQ için davetiye gönderme yetkiniz yok")
+        if rfq_check.data["status"] != "published":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sadece yayınlanmış RFQ'lar için davetiye gönderilebilir")
+
+        suppliers = (
+            db.table("suppliers").select("id", "companies(email, name)").in_("id", [str(sid) for sid in supplier_ids]).execute()
+        )
+        if not suppliers.data or len(suppliers.data) != len(supplier_ids):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bazı tedarikçiler bulunamadı")
+
+        sent_count = 0
+        failed_suppliers: List[str] = []
+        for supplier in suppliers.data:
+            try:
+                invitation_data = {
+                    "rfq_id": str(rfq_id),
+                    "supplier_id": supplier["id"],
+                    "invited_by": current_user["id"],
+                    "status": "sent",
+                }
+                db.table("rfq_invitations").insert(invitation_data).execute()
+                email_log_data = {
+                    "sender_email": current_user["email"],
+                    "recipient_email": supplier["companies"]["email"],
+                    "subject": f"RFQ Davetiyesi: {rfq_check.data['title']}",
+                    "body": f"Sayın {supplier['companies']['name']}, {rfq_check.data['title']} başlıklı RFQ için teklifinizi bekliyoruz.",
+                    "email_type": "rfq_invitation",
+                    "rfq_id": str(rfq_id),
+                    "status": "pending",
+                }
+                db.table("email_logs").insert(email_log_data).execute()
+                sent_count += 1
+            except Exception as e:
+                logger.error(f"Failed to send invitation to supplier {supplier['id']}: {e}")
+                failed_suppliers.append(supplier["companies"]["name"])
+
+        return APIResponse(
+            success=True,
+            data={"sent_count": sent_count, "total_suppliers": len(supplier_ids), "failed_suppliers": failed_suppliers},
+            message=f"{sent_count} tedarikçiye davetiye gönderildi" + (f", {len(failed_suppliers)} gönderilemedi" if failed_suppliers else ""),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"RFQ invitation error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="RFQ davetiyesi gönderilirken hata oluştu")
+
+
+@router.get("/invitations/{rfq_id}", response_model=APIResponse[List[dict]])
+async def get_rfq_invitations(
+    rfq_id: UUID,
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("email:read")),
+):
+    try:
+        rfq_check = db.table("rfqs").select("company_id").eq("id", str(rfq_id)).single().execute()
+        if not rfq_check.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RFQ bulunamadı")
+        if rfq_check.data["company_id"] != current_user["company_id"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bu RFQ'nun davetiyelerini görme yetkiniz yok")
+        result = (
+            db.table("rfq_invitations")
+            .select("*", "suppliers(*, companies(*))")
+            .eq("rfq_id", str(rfq_id))
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return APIResponse(success=True, data=result.data or [])
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"RFQ invitations error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="RFQ davetiyeleri alınırken hata oluştu")
+
+
+@router.get("/stats", response_model=APIResponse[dict])
+async def get_email_stats(
+    current_user = Depends(get_current_user_profile),
+    db: Client = Depends(get_db),
+    _perm_ok: bool = Depends(require_permission("email:read")),
+):
+    try:
+        total_emails = db.table("email_logs").select("id", count="exact").execute()
+        sent_emails = db.table("email_logs").select("id", count="exact").eq("status", "sent").execute()
+        return APIResponse(success=True, data={"total": total_emails.count or 0, "sent": sent_emails.count or 0})
+    except Exception as e:
+        logger.error(f"Email stats error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Email istatistikleri alınırken hata oluştu")
+
