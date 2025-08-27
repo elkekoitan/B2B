@@ -797,9 +797,113 @@ async def utils_upload(f: UploadFile = File(...), current_user: dict = Depends(g
                 if not chunk:
                     break
                 await out.write(chunk)
-        return BaseResponse(success=True, message="Uploaded", data={"path": path, "filename": safe_name})
+        # Return both legacy and UI-expected keys
+        return BaseResponse(
+            success=True,
+            message="Uploaded",
+            data={
+                "path": path,
+                "filename": safe_name,
+                "file_path": path,
+                "file_name": safe_name,
+            },
+        )
     except Exception as e:
         logger.error(f"Upload failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Verification (light)
+@app.post("/verification/request", response_model=BaseResponse, dependencies=[Depends(require_permission("verification", "request"))])
+async def verification_request(body: Dict[str, Any] = Body(...), current_user: dict = Depends(get_current_user)):
+    try:
+        docs = body.get("documents") or []
+        notes = body.get("notes") or ""
+        company_id = current_user.get("metadata", {}).get("company_id") or current_user["user_id"]
+        row = {
+            "id": str(uuid.uuid4()),
+            "user_id": current_user["user_id"],
+            "company_id": company_id,
+            "status": "pending",
+            "documents": docs,
+            "notes": notes,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        try:
+            supabase.table("verification_requests").insert(row).execute()
+        except Exception as e:
+            logger.warning(f"persist verification request failed: {e}")
+        return BaseResponse(success=True, message="Verification requested", data={"request": row})
+    except Exception as e:
+        logger.error(f"Verification request failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/verification/requests", response_model=BaseResponse, dependencies=[Depends(require_permission("verification", "read"))])
+async def verification_requests(page: int = Query(1, ge=1), size: int = Query(10, ge=1, le=100), current_user: dict = Depends(get_current_user)):
+    try:
+        items = []
+        total = 0
+        try:
+            resp = supabase.table("verification_requests").select("*", count="exact").order("created_at", desc=True).execute()
+            rows = resp.data or []
+            # Only pending by default
+            rows = [r for r in rows if (r.get("status") or "").lower() == "pending"]
+            total = len(rows)
+            start = (page - 1) * size
+            rows = rows[start:start + size]
+            for r in rows:
+                items.append({
+                    "id": r.get("id"),
+                    "title": "Company verification requested",
+                    "message": (r.get("notes") or "")[:140],
+                    "data": {"company_id": r.get("company_id")},
+                    "created_at": r.get("created_at"),
+                })
+        except Exception as e:
+            logger.warning(f"fetch verification requests failed: {e}")
+        return BaseResponse(success=True, data={"items": items, "total": total})
+    except Exception as e:
+        logger.error(f"Verification requests failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/verification/approve", response_model=BaseResponse, dependencies=[Depends(require_permission("verification", "approve"))])
+async def verification_approve(body: Dict[str, Any] = Body(...), current_user: dict = Depends(get_current_user)):
+    try:
+        company_id = body.get("company_id")
+        if not company_id:
+            raise HTTPException(status_code=400, detail="company_id required")
+        try:
+            supabase.table("verification_requests").update({
+                "status": "approved",
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("company_id", company_id).execute()
+        except Exception as e:
+            logger.warning(f"approve verification persist failed: {e}")
+        return BaseResponse(success=True, message="Verification approved", data={"company_id": company_id})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verification approve failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/verification/reject", response_model=BaseResponse, dependencies=[Depends(require_permission("verification", "reject"))])
+async def verification_reject(body: Dict[str, Any] = Body(...), current_user: dict = Depends(get_current_user)):
+    try:
+        company_id = body.get("company_id")
+        if not company_id:
+            raise HTTPException(status_code=400, detail="company_id required")
+        try:
+            supabase.table("verification_requests").update({
+                "status": "rejected",
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("company_id", company_id).execute()
+        except Exception as e:
+            logger.warning(f"reject verification persist failed: {e}")
+        return BaseResponse(success=True, message="Verification rejected", data={"company_id": company_id})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Verification reject failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Supplier Endpoints
