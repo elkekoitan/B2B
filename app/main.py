@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, BackgroundTasks, Body
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, BackgroundTasks, Body, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
@@ -778,6 +778,28 @@ async def delete_catalog_item(item_id: str, current_user: dict = Depends(get_cur
         return BaseResponse(success=True, message="Catalog item deleted")
     except Exception as e:
         logger.error(f"Delete catalog item failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Utils
+@app.post("/utils/upload", response_model=BaseResponse, dependencies=[Depends(require_permission("utils", "upload"))])
+async def utils_upload(f: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    try:
+        # Save under logs/uploads for convenience (mounted volume in Docker)
+        import uuid, aiofiles
+        base_dir = os.path.join("logs", "uploads")
+        os.makedirs(base_dir, exist_ok=True)
+        safe_name = f.filename or "file.bin"
+        key = f"{uuid.uuid4()}_{safe_name}"
+        path = os.path.join(base_dir, key)
+        async with aiofiles.open(path, 'wb') as out:
+            while True:
+                chunk = await f.read(1024 * 1024)
+                if not chunk:
+                    break
+                await out.write(chunk)
+        return BaseResponse(success=True, message="Uploaded", data={"path": path, "filename": safe_name})
+    except Exception as e:
+        logger.error(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Supplier Endpoints
