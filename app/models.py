@@ -220,3 +220,31 @@ class OfferComparison(BaseModel):
     offers: List[Offer]
     analysis: Dict[str, Any]
     recommendations: List[str]
+
+# Catalog Models
+class CatalogCreate(BaseModel):
+    product_name: str = Field(..., min_length=1, max_length=255)
+    category: Optional[str] = Field(None, max_length=100)
+    price: Optional[float] = Field(None, ge=0)
+    currency: Optional[str] = Field('USD', min_length=3, max_length=3)
+    supplier_id: Optional[str] = None
+
+class CatalogUpdate(BaseModel):
+    product_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    category: Optional[str] = Field(None, max_length=100)
+    price: Optional[float] = Field(None, ge=0)
+    currency: Optional[str] = Field(None, min_length=3, max_length=3)
+
+class CatalogItem(BaseModel):
+    id: str
+    supplier_id: str
+    product_name: str
+    category: Optional[str] = None
+    price: Optional[float] = None
+    currency: Optional[str] = 'USD'
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+class CatalogListResponse(BaseResponse):
+    data: Optional[List[CatalogItem]] = None
+    total: Optional[int] = None
