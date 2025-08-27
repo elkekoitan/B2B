@@ -107,6 +107,7 @@ ASCII alternatif (hızlı bakış):
 - Backend Testleri: Orchestrate görünürlük testleri eklendi (`/orchestrate/queues`, `/orchestrate/heartbeat`)
 - Catalog API (min): `/catalog` CRUD + `/catalog/mine` ve `/catalog/supplier/{id}` uçları eklendi (filtre/paginasyon basit)
 - Utils: `/utils/upload` (multipart) eklendi; frontend doğrulama yüklemelerini açar
+- Verification (light): `/verification/request`, `/verification/requests`, `/verification/approve`, `/verification/reject` uçları ve entegrasyon testleri eklendi
 
 ## 🔄 Devam Eden
 - Katalog sayfası: düzenleme/paginasyon/filtreler (frontend)
