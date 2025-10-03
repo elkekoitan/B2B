@@ -112,21 +112,30 @@ async def get_rfqs(
 ):
     try:
         query = db.table("rfqs").select("*", "companies(*)")
+        count_query = db.table("rfqs").select("id", count="exact")
+
         if category:
             query = query.eq("category", category)
+            count_query = count_query.eq("category", category)
         if status_filter:
             query = query.eq("status", status_filter)
+            count_query = count_query.eq("status", status_filter)
         if params.search:
             query = query.ilike("title", f"%{params.search}%")
+            count_query = count_query.ilike("title", f"%{params.search}%")
+
         offset = (params.page - 1) * params.size
         query = query.range(offset, offset + params.size - 1)
+
         if params.sort_by:
             ascending = params.sort_order == "asc"
             query = query.order(params.sort_by, desc=not ascending)
         else:
             query = query.order("created_at", desc=True)
+
         result = query.execute()
-        count_result = db.table("rfqs").select("id", count="exact").execute()
+        count_result = count_query.execute()
+
         total = count_result.count or 0
         has_next = (params.page * params.size) < total
         has_previous = params.page > 1
